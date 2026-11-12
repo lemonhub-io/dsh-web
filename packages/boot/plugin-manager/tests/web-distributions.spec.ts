@@ -11,7 +11,10 @@ import { packTar } from '@deepseek-ai/dsh-experimental-webworker-runtime/src/sto
 
 it('installs ordinary disabled bundles and refuses incompatible distributions before code evaluation or profile changes', async () => {
   const profile = await mkdtemp(join(tmpdir(), 'dsh-web-packages-'))
-  const runtime = createWebPackageRuntime(new WorkerModuleLoader({ vfs: new MemoryVfs(), staticModules: {} }), async () => {})
+  const runtime = createWebPackageRuntime(
+    new WorkerModuleLoader({ vfs: new MemoryVfs(), staticModules: {} }),
+    async () => {},
+  )
   const limits = { archiveBytes: 2 * 1024 * 1024, expandedBytes: 32 * 1024 * 1024, files: 1024 }
   const original = JSON.stringify({ name: 'test-profile', dependencies: {}, dsh: { profile: { bundles: [] } } })
   try {
@@ -43,7 +46,9 @@ it('installs ordinary disabled bundles and refuses incompatible distributions be
       compatible: true,
       name: '@dsh-community/hello',
     })
-    expect(await inspectWebBundle(archive({ ...base, engines: { dsh: '>=99' } }), profile, runtime, limits)).toMatchObject({
+    expect(
+      await inspectWebBundle(archive({ ...base, engines: { dsh: '>=99' } }), profile, runtime, limits),
+    ).toMatchObject({
       compatible: false,
       problem: 'version',
     })
@@ -57,7 +62,10 @@ it('installs ordinary disabled bundles and refuses incompatible distributions be
     ).toMatchObject({ compatible: false, problem: 'capability' })
     expect(
       await inspectWebBundle(
-        archive({ ...base, dsh: { ...base.dsh, web: { ...base.dsh.web, modules: { 'index.js': ['missing-dependency'] } } } }),
+        archive({
+          ...base,
+          dsh: { ...base.dsh, web: { ...base.dsh.web, modules: { 'index.js': ['missing-dependency'] } } },
+        }),
         profile,
         runtime,
         limits,
@@ -67,7 +75,17 @@ it('installs ordinary disabled bundles and refuses incompatible distributions be
       await inspectWebBundle(archive(base, { 'package/../escape': new Uint8Array([1]) }), profile, runtime, limits),
     ).toMatchObject({ compatible: false, problem: 'invalid' })
     expect(await readFile(join(profile, 'package.json'), 'utf8')).toBe(original)
-    await installWebBundle(archive(base), profile, runtime, limits)
+    const ordinary = { ...base, dsh: { ...base.dsh, web: undefined, bundle: { patch: './cordis.patch.yml' } } }
+    await installWebBundle(
+      archive(ordinary, {
+        'package/index.js': new Uint8Array(
+          await readFile(new URL('../../../../apps/web/plugin-examples/hello/index.js', import.meta.url)),
+        ),
+      }),
+      profile,
+      runtime,
+      limits,
+    )
     expect(JSON.parse(await readFile(join(profile, 'package.json'), 'utf8'))).toMatchObject({
       dependencies: { '@dsh-community/hello': '1.0.0' },
       dsh: { profile: { bundles: [] } },

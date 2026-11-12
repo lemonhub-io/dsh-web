@@ -74,7 +74,8 @@
     "@deepseek-ai/dsh-util-crypto": "workspace:*",
     "@deepseek-ai/dsh-client-ui-settings": "workspace:*",
     "@deepseek-ai/dsh-plugin-manager": "workspace:*",
-    "@deepseek-ai/dsh-client-product-analytics": "workspace:*"
+    "@deepseek-ai/dsh-client-product-analytics": "workspace:*",
+    "@types/picomatch": "^4.0.3"
   },
   "files": [
     "locale/*.json",
@@ -92,6 +93,8 @@
     "zod": "4.4.3",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@deepseek-ai/dsh-plugin-market-index": "workspace:*",
-    "@deepseek-ai/dsh-util-crypto": "workspace:*"
+    "@deepseek-ai/dsh-util-crypto": "workspace:*",
+    "modern-tar": "^0.8.6",
+    "picomatch": "^4.0.7"
   }
 }

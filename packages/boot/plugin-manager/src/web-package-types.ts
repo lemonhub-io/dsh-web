@@ -9,7 +9,7 @@ export interface WebPackageLimits {
 export interface WebPackageRuntime {
   readonly lowering: string
   readonly capabilities: readonly string[]
-  /** Decode a bounded npm archive with validated relative paths and no links.
+  /** Decode a bounded npm archive and prepare built JavaScript without evaluating it.
    * @param bytes Complete gzip tar bytes.
    * @param limits Compressed expanded and entry limits.
    * @returns Package-relative immutable file views.

@@ -49,7 +49,10 @@ it(
     try {
       server.listen(0, '127.0.0.1')
       await once(server, 'listening')
-      const runtime = createWebPackageRuntime(new WorkerModuleLoader({ vfs: new MemoryVfs(), staticModules: {} }), async () => {})
+      const runtime = createWebPackageRuntime(
+        new WorkerModuleLoader({ vfs: new MemoryVfs(), staticModules: {} }),
+        async () => {},
+      )
       const files = await runtime.unpack(
         new Uint8Array(await readFile(new URL('../public/plugin-community/cordis/hello-1.0.0.tgz', import.meta.url))),
         { archiveBytes: 2097152, expandedBytes: 33554432, files: 1024 },
@@ -62,6 +65,10 @@ it(
       )
       const incompatible = join(directory, 'incompatible.tgz')
       await writeFile(incompatible, gzipSync(packTar(archive)))
+      const sourceFiles: Record<string, Uint8Array> = {}
+      for (const path of ['package.json', 'index.js', 'cordis.patch.yml', 'README.md', 'LICENSE']) {
+        sourceFiles[path] = new Uint8Array(await readFile(new URL('../plugin-examples/hello/' + path, import.meta.url)))
+      }
       browser = await chromium.launch({
         headless: true,
         args: ['--no-sandbox'],
@@ -73,6 +80,7 @@ it(
           context,
           `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`,
           incompatible,
+          sourceFiles,
         )
         expect(result.toolResult).toContain('Cordis ordinary-plugin')
         expect(result.errors).toEqual([])

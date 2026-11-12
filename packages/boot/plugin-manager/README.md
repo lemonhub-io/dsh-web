@@ -115,7 +115,7 @@ Failures: `plugin-manager/unknown-bundle` for a bundle `listBundles()` does not 
 
 ### Prepared Web distributions
 
-Browser-hosted DSH installs prepared builds of ordinary Cordis bundles through `inspectWebBundle` and `importWebBundle`. The Worker supplies archive decoding, capability checks, module resolution and persistence through `webPluginRuntime`; this manager retains the profile manifest, lifecycle, inventory and removal. Imported bundles start disabled and require explicit source trust because they receive full host access. `webBundlePolicy` returns null on hosts without that provider. Limits are configured with `webPackageArchiveBytes` (2097152), `webPackageExpandedBytes` (33554432) and `webPackageFiles` (1024). See the [community format guide](../../../apps/web/platform/plugin-community.md).
+Browser-hosted DSH installs prepared builds of ordinary Cordis bundles through `inspectWebBundle` and `importWebBundle`. The Worker supplies archive decoding, on-demand preparation of built JavaScript, capability checks, module resolution and persistence through `webPluginRuntime`; this manager retains the profile manifest, lifecycle, inventory and removal. Imported bundles start disabled and require explicit source trust because they receive full host access. `webBundlePolicy` returns null on hosts without that provider. Limits are configured with `webPackageArchiveBytes` (2097152), `webPackageExpandedBytes` (33554432) and `webPackageFiles` (1024). See the [community format guide](../../../apps/web/platform/plugin-community.md).
 
 -----
 

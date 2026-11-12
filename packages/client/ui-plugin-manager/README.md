@@ -70,7 +70,7 @@ When the Host attributes a network failure or timeout to a GitHub address and of
 
 ### Plugin community
 
-The preinstalled community installs prepared Web distributions of ordinary Cordis bundles through the existing Plugin Manager. It reuses market index format 1 with optional per-version Web URLs and hashes. Review full host trust before importing a disabled profile dependency, then enable, disable and uninstall through either management view. Existing Node compatibility and Cordis extension points execute the plugin; no separate SDK or installation database is used. The collapsed legacy section preserves isolated HTML page plugins. See the [format guide](../../../../apps/web/platform/plugin-community.md).
+The preinstalled community discovers public GitHub repositories and installs their ordinary built Cordis packages through the existing Plugin Manager. Search uses the dsh-web-plugin topic and accepts direct repository or package-directory links. Downloads pin a commit and verify Git blob identities. The advanced section retains catalog and local archive import. It reuses market index format 1 with optional per-version Web URLs and hashes. Review full host trust before importing a disabled profile dependency, then enable, disable and uninstall through either management view. Existing Node compatibility and Cordis extension points execute the plugin; no separate SDK or installation database is used. The collapsed legacy section preserves isolated HTML page plugins. See the [format guide](../../../../apps/web/platform/plugin-community.md).
 
 ### Updating a registry bundle
 

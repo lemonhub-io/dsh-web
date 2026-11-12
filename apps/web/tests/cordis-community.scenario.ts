@@ -1,5 +1,5 @@
 /** Real Cordis installation through the browser-hosted profile manager. */
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import type { BrowserContext, Page } from 'playwright'
 
 async function remote<T>(page: Page, method: string, args: object): Promise<T> {
@@ -14,7 +14,9 @@ async function remote<T>(page: Page, method: string, args: object): Promise<T> {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ type: 'client-request', rpcId, method, payload: { args } }),
       })
-      const body = (await response.json()) as { result: { ok: true; value: T } | { ok: false; error: { message: string } } }
+      const body = (await response.json()) as {
+        result: { ok: true; value: T } | { ok: false; error: { message: string } }
+      }
       if (!body.result.ok) throw new Error(method + ' ' + body.result.error.message)
       return body.result.value
     },
@@ -33,12 +35,13 @@ async function community(page: Page): Promise<void> {
   const entry = page.getByRole('button', { name: '插件社区', exact: true })
   if (!(await entry.isVisible())) await page.getByRole('button', { name: '更多', exact: true }).first().click()
   await page.getByText('插件社区', { exact: true }).click()
-  await page.getByRole('button', { name: '加载 Cordis 目录', exact: true }).waitFor()
+  await page.getByRole('button', { name: '搜索 GitHub', exact: true }).waitFor()
 }
 /** Exercise the actual distribution and effect lifecycle without a paid model request.
  * @param context Fresh caller-owned browser context.
  * @param origin Assembled static site.
  * @param incompatible Prepared archive with an unsupported DSH requirement.
+ * @param sourceFiles Ordinary unconverted npm files from the committed example.
  * @param capture Optional screenshot evidence callback.
  * @returns Native tool output and verified lifecycle facts.
  */
@@ -46,6 +49,7 @@ export async function cordisCommunityScenario(
   context: BrowserContext,
   origin: string,
   incompatible: string,
+  sourceFiles: Record<string, Uint8Array>,
   capture?: (page: Page, name: string) => Promise<void>,
 ): Promise<{ toolResult: string; checks: string[]; errors: string[] }> {
   const errors: string[] = [],
@@ -59,7 +63,70 @@ export async function cordisCommunityScenario(
     withdrew = new Promise<void>((resolve) => {
       removalComplete = resolve
     })
-  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }
+  const cors = {
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': '*',
+    'access-control-allow-methods': '*',
+  }
+  const repositoryName = 'dsh-tests/ordinary-plugin'
+  const commitSha = '1'.repeat(40),
+    treeSha = '2'.repeat(40)
+  const blobs = Object.entries(sourceFiles).map(([path, bytes]) => ({
+    path,
+    bytes,
+    sha: createHash('sha1')
+      .update(`blob ${bytes.length}\0`)
+      .update(bytes)
+      .digest('hex'),
+  }))
+  let rateLimited = false
+  await context.route('https://api.github.com/**', async (route) => {
+    const url = new URL(route.request().url())
+    let body: object | undefined
+    if (url.pathname === '/search/repositories' && url.searchParams.get('q')?.includes('topic:dsh-web-plugin')) {
+      if (rateLimited) {
+        await route.fulfill({ status: 429, headers: { ...cors, 'x-ratelimit-remaining': '0' }, body: '{}' })
+        return
+      }
+      body = {
+        items: [
+          { full_name: repositoryName, description: 'Ordinary Cordis plugin from GitHub', default_branch: 'main' },
+        ],
+      }
+    } else if (url.pathname === '/repos/' + repositoryName + '/commits/main') {
+      body = { sha: commitSha, commit: { tree: { sha: treeSha } } }
+    } else if (url.pathname === '/repos/' + repositoryName + '/git/trees/' + treeSha) {
+      body = {
+        truncated: false,
+        tree: blobs.map(file => ({
+          path: file.path,
+          sha: file.sha,
+          type: 'blob',
+          mode: '100644',
+          size: file.bytes.length,
+        })),
+      }
+    } else if (url.pathname.startsWith('/repos/' + repositoryName + '/git/blobs/')) {
+      const file = blobs.find(item => url.pathname.endsWith('/' + item.sha))
+      if (file === undefined) throw new Error('Unpinned Git blob request ' + url.pathname)
+      if (route.request().headers().accept !== 'application/vnd.github.raw+json')
+        throw new Error('Git blob was not requested as raw bytes')
+      await route.fulfill({
+        status: 200,
+        headers: { ...cors, 'content-type': 'application/octet-stream' },
+        body: Buffer.from(file.bytes),
+      })
+      return
+    } else {
+      await route.continue()
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      headers: { ...cors, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  })
   await context.route('https://api.deepseek.com/**', async (route) => {
     const request = route.request()
     if (request.method() === 'OPTIONS') {
@@ -97,7 +164,10 @@ export async function cordisCommunityScenario(
         index: 0,
         content_block: { type: 'tool_use', id: 'cordis_call', name: 'community_echo', input: {} },
       })
-      emit('content_block_delta', { index: 0, delta: { type: 'input_json_delta', partial_json: '{"text":"ordinary-plugin"}' } })
+      emit('content_block_delta', {
+        index: 0,
+        delta: { type: 'input_json_delta', partial_json: '{"text":"ordinary-plugin"}' },
+      })
       emit('content_block_stop', { index: 0 })
       emit('message_delta', { delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 1 } })
     } else {
@@ -115,7 +185,11 @@ export async function cordisCommunityScenario(
       emit('message_delta', { delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } })
     }
     emit('message_stop', {})
-    await route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'text/event-stream' }, body: events.join('') })
+    await route.fulfill({
+      status: 200,
+      headers: { ...cors, 'content-type': 'text/event-stream' },
+      body: events.join(''),
+    })
   })
   const page = await context.newPage()
   page.on('pageerror', (error) => {
@@ -139,11 +213,20 @@ export async function cordisCommunityScenario(
   try {
     await page.goto(origin, { waitUntil: 'domcontentloaded' })
     await community(page)
-    await page.getByRole('button', { name: '加载 Cordis 目录', exact: true }).click()
+    const repository = page
+      .locator('article')
+      .filter({ has: page.getByRole('heading', { name: repositoryName, exact: true }) })
+    await repository.getByRole('button', { name: '查看插件', exact: true }).click()
     const listing = page
       .locator('article')
       .filter({ has: page.getByRole('heading', { name: '@dsh-community/hello', exact: true }) })
-    await listing.getByRole('button', { name: '检查发行包', exact: true }).click()
+    const download = page.waitForEvent('download')
+    await listing.getByRole('button', { name: '下载插件包', exact: true }).click()
+    const artifact = await download
+    if (!artifact.suggestedFilename().endsWith('.tgz') || (await artifact.failure()) !== null)
+      throw new Error('GitHub package download failed')
+    checks.push('Discovered tagged GitHub repositories and downloaded an ordinary npm archive from pinned Git blobs')
+    await listing.getByRole('button', { name: '检查并安装', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '检查 Cordis 插件', exact: true })
     await dialog.waitFor()
     if (!(await dialog.getByRole('button', { name: '安装到插件管理器', exact: true }).isDisabled()))
@@ -152,7 +235,9 @@ export async function cordisCommunityScenario(
     await dialog.getByRole('button', { name: '安装到插件管理器', exact: true }).click()
     await dialog.waitFor({ state: 'hidden' })
     await page.getByText('已停用', { exact: true }).waitFor()
-    checks.push('An existing-format market release installed as a disabled dependency in the shared plugin manager')
+    checks.push(
+      'An ordinary GitHub package was converted without a separate build and installed disabled through the shared manager',
+    )
     await page.getByRole('button', { name: '启用插件', exact: true }).click()
     await page.getByText('已启用', { exact: true }).waitFor()
     await page.reload({ waitUntil: 'domcontentloaded' })
@@ -172,6 +257,7 @@ export async function cordisCommunityScenario(
     if (!toolResult.includes('Cordis ordinary-plugin'))
       throw new Error('Native plugin returned the wrong model-visible result ' + toolResult)
     checks.push('The real agent loop called the ordinary ctx.tools registration and logged its result')
+    await page.getByText('从目录链接或本地文件安装', { exact: true }).click()
     await page.locator('input[type=file][accept*=".tgz"]').setInputFiles(incompatible)
     await dialog.getByText('插件要求的 DSH 版本与当前版本不兼容', { exact: true }).waitFor()
     if (!(await dialog.getByRole('button', { name: '安装到插件管理器', exact: true }).isDisabled()))
@@ -202,6 +288,10 @@ export async function cordisCommunityScenario(
     await wait(withdrew)
     if (!removed) throw new Error('Uninstall left the plugin tool registered')
     checks.push('The shared manager stopped contributions and removed the package and its model tool')
+    rateLimited = true
+    await page.getByRole('button', { name: '搜索 GitHub', exact: true }).click()
+    await page.getByText('GitHub 请求额度已用尽 请稍后重试', { exact: true }).waitFor()
+    checks.push('GitHub rate limits were reported without discarding existing discovery results')
     if (errors.length > 0) throw new Error(errors.join('\n'))
     return { checks, toolResult, errors }
   } catch (error) {

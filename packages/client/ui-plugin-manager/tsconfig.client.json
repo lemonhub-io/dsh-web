@@ -56,9 +56,6 @@
     },
     {
       "path": "../../util/plugin-market-index"
-    },
-    {
-      "path": "../../util/crypto"
     }
   ],
   "include": [

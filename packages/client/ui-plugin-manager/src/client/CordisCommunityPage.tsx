@@ -2,10 +2,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Input, Modal, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
-import type { BundleInfo, WebBundleInspection, WebPackageLimits, ChangeResult } from '@deepseek-ai/dsh-plugin-manager/types'
+import type {
+  BundleInfo,
+  WebBundleInspection,
+  WebPackageLimits,
+  ChangeResult,
+} from '@deepseek-ai/dsh-plugin-manager/types'
 import { parseMarketIndex } from '@deepseek-ai/dsh-plugin-market-index'
 import { bytesToBase64 } from '@deepseek-ai/dsh-util-crypto'
 import css from './CommunityPage.module.css'
+import { CommunitySourceError, downloadCommunityBytes as download } from './community-download.ts'
+import {
+  discoverGitHub,
+  githubPackages,
+  downloadGitHubPackage,
+  type GitHubRepository,
+  type GitHubPackage,
+} from './github-community.ts'
 
 /** Plain callbacks preserve Cordis ownership outside the rendered page. */
 export interface CordisCommunityFace {
@@ -26,37 +39,10 @@ interface Listing {
 interface Candidate {
   encoded: string
   report: WebBundleInspection
+  source?: string
 }
 type Props = PropsLocale<'pluginCommunity'> & InjectFace<CordisCommunityFace>
 
-async function download(address: string, limit: number, signal: AbortSignal): Promise<Uint8Array> {
-  const url = new URL(address, location.href)
-  if ((url.protocol !== 'https:' && url.origin !== location.origin) || url.username !== '' || url.password !== '')
-    throw new Error('Invalid source')
-  const response = await fetch(url, { credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer', signal })
-  if (!response.ok || response.body === null) throw new Error('Download failed')
-  const reader = response.body.getReader(),
-    parts: Uint8Array[] = []
-  let size = 0
-  try {
-    for (;;) {
-      const chunk = await reader.read()
-      if (chunk.done) break
-      size += chunk.value.length
-      if (size > limit) throw new Error('Download too large')
-      parts.push(chunk.value)
-    }
-  } finally {
-    await reader.cancel()
-  }
-  const bytes = new Uint8Array(size)
-  let at = 0
-  for (const part of parts) {
-    bytes.set(part, at)
-    at += part.length
-  }
-  return bytes
-}
 function catalog(value: unknown, base: string): Listing[] {
   const parsed = parseMarketIndex(value, base)
   if (parsed.plugins.length > 100) throw new Error('Too many catalog entries')
@@ -75,6 +61,23 @@ function catalog(value: unknown, base: string): Listing[] {
     ),
   )
 }
+function sourceFailure(error: unknown): keyof typeof import('./cordis-community-locales.ts').cordisZh {
+  if (!(error instanceof CommunitySourceError)) return 'cordisFailed'
+  switch (error.code) {
+    case 'rate':
+      return 'githubRate'
+    case 'missing':
+      return 'githubMissing'
+    case 'empty':
+      return 'githubEmpty'
+    case 'size':
+      return 'cordisSize'
+    case 'invalid':
+      return 'githubInvalid'
+    case 'network':
+      return 'cordisDownloadFailed'
+  }
+}
 /** Render catalog downloads and the shared manager inventory.
  * @param props Localized callbacks for the existing plugin manager.
  * @returns Community sections without a separate runtime or installation database.
@@ -85,6 +88,9 @@ export function CordisCommunityPage(props: Props): ReactNode {
     [bundles, setBundles] = useState<BundleInfo[]>([])
   const [listings, setListings] = useState<Listing[]>([]),
     [candidate, setCandidate] = useState<Candidate>()
+  const [repositories, setRepositories] = useState<GitHubRepository[]>([])
+  const [githubPlugins, setGithubPlugins] = useState<GitHubPackage[]>([])
+  const [githubQuery, setGithubQuery] = useState('')
   const [source, setSource] = useState('/plugin-community/cordis/index.json'),
     [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false),
@@ -103,9 +109,19 @@ export function CordisCommunityPage(props: Props): ReactNode {
   useEffect(() => {
     const controller = new AbortController()
     lifetime.current = controller
-    void load(controller.signal).catch(() => {
-      if (!controller.signal.aborted) setProblem('cordisFailed')
-    })
+    setBusy(true)
+    void Promise.all([
+      load(controller.signal),
+      discoverGitHub('', AbortSignal.any([controller.signal, AbortSignal.timeout(15000)])).then((items) => {
+        if (!controller.signal.aborted) setRepositories(items)
+      }),
+    ])
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setProblem(sourceFailure(error))
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setBusy(false)
+      })
     return () => {
       controller.abort()
     }
@@ -116,18 +132,22 @@ export function CordisCommunityPage(props: Props): ReactNode {
     setProblem(undefined)
     try {
       await action()
-    } catch (_failedOperation) {
-      if (!lifetime.current.signal.aborted) setProblem('cordisFailed')
+    } catch (error) {
+      if (!lifetime.current.signal.aborted) setProblem(sourceFailure(error))
     } finally {
       if (!lifetime.current.signal.aborted) setBusy(false)
     }
   }
-  const review = async (bytes: Uint8Array, release?: Listing): Promise<void> => {
+  const review = async (
+    bytes: Uint8Array,
+    release?: Pick<Listing, 'name' | 'version'> & { sha256?: string },
+    origin?: string,
+  ): Promise<void> => {
     if (limits === null || limits === undefined || bytes.length > limits.archiveBytes) {
       setProblem('cordisSize')
       return
     }
-    if (release !== undefined) {
+    if (release?.sha256 !== undefined) {
       const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))
       if ([...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('') !== release.sha256) {
         setProblem('cordisIntegrity')
@@ -136,13 +156,17 @@ export function CordisCommunityPage(props: Props): ReactNode {
     }
     const encoded = bytesToBase64(bytes),
       report = await props.inspect(encoded)
-    if (release !== undefined && report.compatible && (report.name !== release.name || report.version !== release.version)) {
+    if (
+      release !== undefined &&
+      report.compatible &&
+      (report.name !== release.name || report.version !== release.version)
+    ) {
       setProblem('cordisIntegrity')
       return
     }
     if (lifetime.current.signal.aborted) return
     setTrusted(false)
-    setCandidate({ encoded, report })
+    setCandidate({ encoded, report, ...(origin === undefined ? {} : { source: origin }) })
   }
   const result = async (action: Promise<ChangeResult>): Promise<void> => {
     const value = await action
@@ -179,75 +203,207 @@ export function CordisCommunityPage(props: Props): ReactNode {
         onSubmit={(event) => {
           event.preventDefault()
           void work(async () => {
-            const bytes = await download(
-              source,
-              512 * 1024,
+            const items = await discoverGitHub(
+              githubQuery,
               AbortSignal.any([lifetime.current.signal, AbortSignal.timeout(15000)]),
             )
-            setListings(catalog(JSON.parse(new TextDecoder().decode(bytes)), new URL(source, location.href).href))
+            if (!lifetime.current.signal.aborted) {
+              setRepositories(items)
+              setGithubPlugins([])
+            }
           })
         }}
       >
-        <label htmlFor="cordis-source">{t('cordisCatalog')}</label>
+        <label htmlFor="github-query">{t('githubSearch')}</label>
         <div className={css.row}>
-          <Input id="cordis-source" value={source} onChange={event => setSource(event.target.value)} />
-          <Button type="submit" variant="outline" disabled={busy || source.trim() === ''}>
-            {t('cordisLoad')}
+          <Input
+            id="github-query"
+            value={githubQuery}
+            placeholder={t('githubHint')}
+            onChange={event =>{  setGithubQuery(event.target.value); }}
+          />
+          <Button type="submit" variant="outline" disabled={busy}>
+            {t('githubFind')}
           </Button>
         </div>
       </form>
-      <form
-        className={css.form}
-        onSubmit={(event) => {
-          event.preventDefault()
-          void work(async () => {
-            if (limits == null) return
-            await review(
-              await download(url, limits.archiveBytes, AbortSignal.any([lifetime.current.signal, AbortSignal.timeout(15000)])),
-            )
-          })
-        }}
-      >
-        <label htmlFor="cordis-url">{t('cordisUrl')}</label>
-        <div className={css.row}>
-          <Input id="cordis-url" value={url} onChange={event => setUrl(event.target.value)} />
-          <Button type="submit" variant="outline" disabled={busy || limits == null || url.trim() === ''}>
-            {t('cordisCheck')}
-          </Button>
-          <Button variant="outline" disabled={busy || limits == null} onClick={() => file.current?.click()}>
-            {t('cordisFile')}
-          </Button>
-        </div>
-        <input
-          ref={file}
-          type="file"
-          className={css.file}
-          accept=".tgz,.tar.gz,application/gzip"
-          aria-label={t('cordisFile')}
-          onChange={(event) => {
-            const selected = event.target.files?.[0]
-            event.target.value = ''
-            if (selected !== undefined)
-              void work(async () => {
-                if (limits == null || selected.size > limits.archiveBytes) {
-                  setProblem('cordisSize')
-                  return
-                }
-                await review(new Uint8Array(await selected.arrayBuffer()))
-              })
-          }}
-        />
-      </form>
+      <p className={css.note}>{t('githubScope')}</p>
       <div className={css.feedback} aria-live="polite">
         {busy && <span role="status">{t('loading')}</span>}
         {problem !== undefined && <p role="alert">{t(problem)}</p>}
       </div>
+      {!busy && repositories.length === 0 && <p className={css.note}>{t('githubNoResults')}</p>}
+      <div className={css.grid}>
+        {repositories.map(repo => (
+          <article key={repo.name + repo.directory} className={css.card}>
+            <h3>{repo.name}</h3>
+            <p>{repo.description}</p>
+            {repo.directory !== '' && <p className={css.note}>{repo.directory}</p>}
+            <div className={css.actions}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || limits == null}
+                onClick={() => {
+                  void work(async () => {
+                    const items = await githubPackages(
+                      repo,
+                      AbortSignal.any([lifetime.current.signal, AbortSignal.timeout(60000)]),
+                    )
+                    if (!lifetime.current.signal.aborted) setGithubPlugins(items)
+                  })
+                }}
+              >
+                {t('githubPackages')}
+              </Button>
+              <a href={'https://github.com/' + repo.name} target="_blank" rel="noreferrer">
+                {t('githubRepository')}
+              </a>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className={css.grid}>
+        {githubPlugins.map(pkg => (
+          <article key={pkg.repository + pkg.directory + pkg.commit} className={css.card}>
+            <div className={css.heading}>
+              <h3>{pkg.name}</h3>
+              <Tag>{pkg.version}</Tag>
+            </div>
+            <p>{pkg.description}</p>
+            <p className={css.note}>{pkg.repository + ' ' + pkg.commit.slice(0, 12)}</p>
+            <div className={css.actions}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || limits == null}
+                onClick={() => {
+                  void work(async () => {
+                    if (limits == null) return
+                    const bytes = await downloadGitHubPackage(
+                      pkg,
+                      limits,
+                      AbortSignal.any([lifetime.current.signal, AbortSignal.timeout(120000)]),
+                    )
+                    await review(bytes, pkg, pkg.repository + ' ' + pkg.commit)
+                  })
+                }}
+              >
+                {t('githubInstall')}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={busy || limits == null}
+                onClick={() => {
+                  void work(async () => {
+                    if (limits == null) return
+                    const bytes = await downloadGitHubPackage(
+                      pkg,
+                      limits,
+                      AbortSignal.any([lifetime.current.signal, AbortSignal.timeout(120000)]),
+                    )
+                    if (lifetime.current.signal.aborted) return
+                    const href = URL.createObjectURL(
+                      new Blob([new Uint8Array(bytes)], {
+                        type: 'application/gzip',
+                      }),
+                    )
+                    try {
+                      const link = document.createElement('a')
+                      link.href = href
+                      link.download = pkg.name.replaceAll('/', '-') + '-' + pkg.version + '.tgz'
+                      link.click()
+                    } finally {
+                      URL.revokeObjectURL(href)
+                    }
+                  })
+                }}
+              >
+                {t('download')}
+              </Button>
+            </div>
+          </article>
+        ))}
+      </div>
+      <details className={css.section}>
+        <summary>{t('githubAdvanced')}</summary>
+
+        <form
+          className={css.form}
+          onSubmit={(event) => {
+            event.preventDefault()
+            void work(async () => {
+              const bytes = await download(
+                source,
+                512 * 1024,
+                AbortSignal.any([lifetime.current.signal, AbortSignal.timeout(15000)]),
+              )
+              setListings(catalog(JSON.parse(new TextDecoder().decode(bytes)), new URL(source, location.href).href))
+            })
+          }}
+        >
+          <label htmlFor="cordis-source">{t('cordisCatalog')}</label>
+          <div className={css.row}>
+            <Input id="cordis-source" value={source} onChange={event =>{  setSource(event.target.value); }} />
+            <Button type="submit" variant="outline" disabled={busy || source.trim() === ''}>
+              {t('cordisLoad')}
+            </Button>
+          </div>
+        </form>
+        <form
+          className={css.form}
+          onSubmit={(event) => {
+            event.preventDefault()
+            void work(async () => {
+              if (limits == null) return
+              await review(
+                await download(
+                  url,
+                  limits.archiveBytes,
+                  AbortSignal.any([lifetime.current.signal, AbortSignal.timeout(15000)]),
+                ),
+              )
+            })
+          }}
+        >
+          <label htmlFor="cordis-url">{t('cordisUrl')}</label>
+          <div className={css.row}>
+            <Input id="cordis-url" value={url} onChange={event =>{  setUrl(event.target.value); }} />
+            <Button type="submit" variant="outline" disabled={busy || limits == null || url.trim() === ''}>
+              {t('cordisCheck')}
+            </Button>
+            <Button variant="outline" disabled={busy || limits == null} onClick={() => file.current?.click()}>
+              {t('cordisFile')}
+            </Button>
+          </div>
+          <input
+            ref={file}
+            type="file"
+            className={css.file}
+            accept=".tgz,.tar.gz,application/gzip"
+            aria-label={t('cordisFile')}
+            onChange={(event) => {
+              const selected = event.target.files?.[0]
+              event.target.value = ''
+              if (selected !== undefined)
+                void work(async () => {
+                  if (limits == null || selected.size > limits.archiveBytes) {
+                    setProblem('cordisSize')
+                    return
+                  }
+                  await review(new Uint8Array(await selected.arrayBuffer()))
+                })
+            }}
+          />
+        </form>
+      </details>
       <Input
         type="search"
         aria-label={t('search')}
         placeholder={t('searchHint')}
         value={search}
-        onChange={event => setSearch(event.target.value)}
+        onChange={event =>{  setSearch(event.target.value); }}
       />
       <div className={css.heading}>
         <h2>{t('cordisInstalled')}</h2>
@@ -265,7 +421,7 @@ export function CordisCommunityPage(props: Props): ReactNode {
       {bundles.length === 0 && <p className={css.note}>{t('cordisEmpty')}</p>}
       <div className={css.grid}>
         {bundles
-          .filter(b => (b.name + b.description).toLowerCase().includes(search.toLowerCase()))
+          .filter(b => `${b.name} ${b.description ?? ''}`.toLowerCase().includes(search.toLowerCase()))
           .map(b => (
             <article key={b.name} className={css.card}>
               <div className={css.heading}>
@@ -302,11 +458,10 @@ export function CordisCommunityPage(props: Props): ReactNode {
             </article>
           ))}
       </div>
-      <h2>{t('available')}</h2>
-      {listings.length === 0 && <p className={css.note}>{t('cordisNoCatalog')}</p>}
+      {listings.length > 0 && <h2>{t('available')}</h2>}
       <div className={css.grid}>
         {listings
-          .filter(b => (b.name + b.description).toLowerCase().includes(search.toLowerCase()))
+          .filter(b => `${b.name} ${b.description ?? ''}`.toLowerCase().includes(search.toLowerCase()))
           .map(b => (
             <article key={b.name + b.version} className={css.card}>
               <h3>{b.name}</h3>
@@ -349,20 +504,21 @@ export function CordisCommunityPage(props: Props): ReactNode {
         >
           <div className={css.section}>
             <h3>{candidate.report.name}</h3>
+            {candidate.source !== undefined && <p className={css.note}>{candidate.source}</p>}
             <p>{candidate.report.version}</p>
             <p>{candidate.report.compatible ? t('cordisReady') : t(failure(candidate.report.problem))}</p>
             {candidate.report.compatible && (
               <>
                 <p>{t('cordisWarning')}</p>
                 <label className={css.row}>
-                  <input type="checkbox" checked={trusted} onChange={event => setTrusted(event.target.checked)} />
+                  <input type="checkbox" checked={trusted} onChange={event =>{  setTrusted(event.target.checked); }} />
                   {t('cordisTrust')}
                 </label>
               </>
             )}
             {problem !== undefined && <p role="alert">{t(problem)}</p>}
             <div className={css.actions}>
-              <Button variant="outline" disabled={busy} onClick={() => setCandidate(undefined)}>
+              <Button variant="outline" disabled={busy} onClick={() =>{  setCandidate(undefined); }}>
                 {t('cordisCancel')}
               </Button>
               <Button

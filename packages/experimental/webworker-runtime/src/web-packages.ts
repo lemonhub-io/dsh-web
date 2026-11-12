@@ -5,6 +5,7 @@ import { MODULE_PROXIES } from './module-proxies.ts'
 import { parseTar } from './storage/tar.ts'
 import type { WorkerModuleLoader } from './module-system/module-loader.ts'
 import { dirname, join } from './module-system/posix-path.ts'
+import { prepareWebPackage } from './compile/web-package.ts'
 
 /** Supply bounded archive decoding and the running Worker's ordinary resolver.
  * @param loader Current host module loader.
@@ -60,7 +61,11 @@ export function createWebPackageRuntime(loader: WorkerModuleLoader, flush: () =>
         names.add(name.toLowerCase())
         if (!entry.directory) files[name.slice('package/'.length)] = entry.bytes
       }
-      return files
+      const prepared = prepareWebPackage(files)
+      if (Object.values(prepared).reduce((total, bytes) => total + bytes.length, 0) > limits.expandedBytes) {
+        throw new Error('Prepared package exceeds the expanded limit')
+      }
+      return prepared
     },
     validate(directory, modules) {
       for (const [path, requests] of Object.entries(modules)) {

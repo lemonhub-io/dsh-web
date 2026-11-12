@@ -101,11 +101,11 @@ async function prepare(encoded: string, runtime: WebPackageRuntime, limits: WebP
   if (
     !Array.isArray(patches) ||
     patches.length === 0 ||
-    patches.some(p => typeof p !== 'string' || !safePath(p) || files[p] === undefined)
+    patches.some(p => typeof p !== 'string' || !safePath(p.replace(/^\.\//, '')) || files[p.replace(/^\.\//, '')] === undefined)
   )
     throw new WebPackageFailure('invalid')
   for (const path of Object.keys(files)) {
-    if (/\.(?:node|ts|tsx)$/i.test(path)) throw new WebPackageFailure('native')
+    if (/\.(?:node|[cm]?ts|tsx)$/i.test(path) && !/\.d\.(?:ts|mts|cts)$/i.test(path)) throw new WebPackageFailure('native')
     if (/\.(?:js|mjs|cjs)$/.test(path) && modules[path] === undefined) throw new WebPackageFailure('invalid')
   }
   const manifest: ProfileManifest & { name: string; version: string } = { ...value, name: value.name, version: value.version }

@@ -18,9 +18,9 @@
  * for a module that declares or assigns an import's name somewhere, because
  * elsewhere every read of the name is the import.
  *
- * The image packer is this transform's only caller: it lowers every JavaScript
- * entry it packs and records `LOWERING_VERSION` in the image manifest, so the
- * worker wraps those bodies without carrying a compiler of its own.
+ * The image packer and on-demand package preparation share this transform.
+ * Both record `LOWERING_VERSION` so module execution can reject incompatible
+ * wrappers without evaluating their JavaScript.
  * @module @deepseek-ai/dsh-experimental-webworker-runtime/src/compile/transform
  */
 import { parse, type Identifier, type Literal, type Program } from 'acorn'
