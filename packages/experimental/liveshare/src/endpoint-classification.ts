@@ -139,7 +139,9 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'workspaceFiles/readBytes': 'owner-only', // absolute paths reach files outside the Workspace, so no share offers it
   'workspaceFiles/stat': 'owner-only', // absolute paths reach files outside the Workspace, so no share offers it
   'pluginManager/cancelInstall': 'owner-only', // owner plugin management
+  'pluginManager/importWebBundle': 'owner-only', // owner plugin management
   'pluginManager/inspect': 'owner-only', // owner plugin management
+  'pluginManager/inspectWebBundle': 'owner-only', // owner plugin management
   'pluginManager/installBundle': 'owner-only', // owner plugin management
   'pluginManager/listBundles': 'owner-only', // owner plugin management
   'pluginManager/listPlugins': 'owner-only', // owner plugin management
@@ -153,6 +155,7 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'pluginManager/setVersionExemption': 'owner-only', // owner plugin management
   'pluginManager/updateBundle': 'owner-only', // owner plugin management
   'pluginManager/waitForInstall': 'owner-only', // owner plugin management
+  'pluginManager/webBundlePolicy': 'owner-only', // owner plugin management
   'pluginMarket/listIndexes': 'owner-only', // owner plugin market
   'pluginMarket/readEntryDetail': 'owner-only', // owner plugin market
   'pluginMarket/search': 'owner-only', // owner plugin market
