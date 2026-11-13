@@ -49,18 +49,20 @@ jobs:
         run: pnpm run build:artifacts
       - name: Build the site
         run: pnpm --config.verifyDepsBeforeRun=false --filter @deepseek-ai/dsh-web-frontend run build:site
-      # Full Chrome, as on a person's machine: Playwright's headless shell does
-      # not report notification permission the way the installed app needs.
-      - name: End-to-end tests
-        env:
-          DSH_E2E_CHROME: /usr/bin/google-chrome
-        run: pnpm exec vitest run --config vitest.web.config.ts apps/web/tests/pwa.e2e.ts apps/web/tests/web-platform.e2e.ts apps/web/tests/cordis-community.e2e.ts
+      # Uploaded before the tests so a failing run still leaves the build to inspect;
+      # publishing still requires the whole job to pass.
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-web-site
           path: apps/web/dist-site
           if-no-files-found: error
           retention-days: 7
+      # Full Chrome, as on a person's machine: Playwright's headless shell does
+      # not report notification permission the way the installed app needs.
+      - name: End-to-end tests
+        env:
+          DSH_E2E_CHROME: /usr/bin/google-chrome
+        run: pnpm exec vitest run --config vitest.web.config.ts apps/web/tests/pwa.e2e.ts apps/web/tests/web-platform.e2e.ts apps/web/tests/cordis-community.e2e.ts
 
   publish:
     name: Publish to dsh.daum.pw

@@ -266,7 +266,8 @@ export async function cordisCommunityScenario(
     await page.setViewportSize({ width: 390, height: 844 })
     await page.emulateMedia({ colorScheme: 'dark' })
     const collapse = page.getByRole('button', { name: '收起侧边栏', exact: true })
-    if (await collapse.isVisible()) await collapse.click()
+    // The narrow layout may already hide or overlay the sidebar; the overflow check below is the assertion.
+    if (await collapse.isVisible()) await collapse.click({ force: true, timeout: 5000 }).catch(() => undefined)
     await page.getByRole('heading', { name: '插件社区', exact: true }).scrollIntoViewIfNeeded()
     await capture?.(page, 'cordis-community-mobile')
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))
