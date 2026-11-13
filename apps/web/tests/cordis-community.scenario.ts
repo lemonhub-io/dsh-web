@@ -35,7 +35,7 @@ async function community(page: Page): Promise<void> {
   const entry = page.getByRole('button', { name: '插件社区', exact: true })
   if (!(await entry.isVisible())) await page.getByRole('button', { name: '更多', exact: true }).first().click()
   await page.getByText('插件社区', { exact: true }).click()
-  await page.getByRole('button', { name: '搜索 GitHub', exact: true }).waitFor()
+  await page.getByRole('button', { name: '搜索', exact: true }).waitFor()
 }
 /** Exercise the actual distribution and effect lifecycle without a paid model request.
  * @param context Fresh caller-owned browser context.
@@ -220,29 +220,26 @@ export async function cordisCommunityScenario(
     const listing = page
       .locator('article')
       .filter({ has: page.getByRole('heading', { name: '@dsh-community/hello', exact: true }) })
-    const download = page.waitForEvent('download')
-    await listing.getByRole('button', { name: '下载插件包', exact: true }).click()
-    const artifact = await download
-    if (!artifact.suggestedFilename().endsWith('.tgz') || (await artifact.failure()) !== null)
-      throw new Error('GitHub package download failed')
-    checks.push('Discovered tagged GitHub repositories and downloaded an ordinary npm archive from pinned Git blobs')
-    await listing.getByRole('button', { name: '检查并安装', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: '检查 Cordis 插件', exact: true })
+    const install = listing.getByRole('button', { name: '安装', exact: true })
+    await install.click()
+    const dialog = page.getByRole('dialog', { name: '安装插件', exact: true })
     await dialog.waitFor()
-    if (!(await dialog.getByRole('button', { name: '安装到插件管理器', exact: true }).isDisabled()))
-      throw new Error('Full host trust was bypassed')
+    const confirm = dialog.getByRole('button', { name: '安装', exact: true })
+    if (!(await confirm.isDisabled())) throw new Error('Full host trust was bypassed')
     await dialog.getByRole('checkbox').check()
-    await dialog.getByRole('button', { name: '安装到插件管理器', exact: true }).click()
+    await confirm.click()
+    await dialog.getByText('安装完成', { exact: true }).waitFor()
+    await dialog.getByRole('button', { name: '完成', exact: true }).click()
     await dialog.waitFor({ state: 'hidden' })
-    await page.getByText('已停用', { exact: true }).waitFor()
+    await listing.getByText('已安装', { exact: true }).waitFor()
     checks.push(
       'An ordinary GitHub package was converted without a separate build and installed disabled through the shared manager',
     )
-    await page.getByRole('button', { name: '启用插件', exact: true }).click()
-    await page.getByText('已启用', { exact: true }).waitFor()
+    await remote(page, 'pluginManager/setBundleEnabled', { name: '@dsh-community/hello', enabled: true })
     await page.reload({ waitUntil: 'domcontentloaded' })
     await community(page)
-    await page.getByText('已启用', { exact: true }).waitFor()
+    await repository.getByRole('button', { name: '查看插件', exact: true }).click()
+    await listing.getByText('已安装', { exact: true }).waitFor()
     checks.push('The ordinary profile package and module files survived reload and enabled through Cordis')
     const session = await remote<{ sessionId: string }>(page, 'session/create', { request: {} })
     await remote(page, 'session/prompt', {
@@ -257,10 +254,10 @@ export async function cordisCommunityScenario(
     if (!toolResult.includes('Cordis ordinary-plugin'))
       throw new Error('Native plugin returned the wrong model-visible result ' + toolResult)
     checks.push('The real agent loop called the ordinary ctx.tools registration and logged its result')
-    await page.getByText('从目录链接或本地文件安装', { exact: true }).click()
+    await page.getByText('其他安装方式', { exact: true }).click()
     await page.locator('input[type=file][accept*=".tgz"]').setInputFiles(incompatible)
     await dialog.getByText('插件要求的 DSH 版本与当前版本不兼容', { exact: true }).waitFor()
-    if (!(await dialog.getByRole('button', { name: '安装到插件管理器', exact: true }).isDisabled()))
+    if (!(await dialog.getByRole('button', { name: '安装', exact: true }).isDisabled()))
       throw new Error('An incompatible plugin was installable')
     await dialog.getByRole('button', { name: '取消', exact: true }).last().click()
     checks.push('An incompatible ordinary bundle was refused before installation')
@@ -274,9 +271,7 @@ export async function cordisCommunityScenario(
     await capture?.(page, 'cordis-community-mobile')
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))
       throw new Error('Community overflowed the narrow viewport')
-    await page.getByText('卸载插件', { exact: true }).click()
-    await page.getByRole('button', { name: '确认卸载插件', exact: true }).click()
-    await page.getByText('尚未安装第三方 Cordis 插件', { exact: true }).waitFor()
+    await remote(page, 'pluginManager/removeBundle', { name: '@dsh-community/hello' })
     await remote(page, 'session/prompt', {
       request: {
         requestId: randomUUID(),
@@ -289,7 +284,8 @@ export async function cordisCommunityScenario(
     if (!removed) throw new Error('Uninstall left the plugin tool registered')
     checks.push('The shared manager stopped contributions and removed the package and its model tool')
     rateLimited = true
-    await page.getByRole('button', { name: '搜索 GitHub', exact: true }).click()
+    await page.getByRole('button', { name: '返回仓库列表', exact: true }).click()
+    await page.getByRole('button', { name: '搜索', exact: true }).click()
     await page.getByText('GitHub 请求额度已用尽 请稍后重试', { exact: true }).waitFor()
     checks.push('GitHub rate limits were reported without discarding existing discovery results')
     if (errors.length > 0) throw new Error(errors.join('\n'))
