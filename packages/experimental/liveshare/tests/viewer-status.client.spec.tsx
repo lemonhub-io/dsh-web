@@ -42,25 +42,25 @@ const ROWS: readonly StatusRow[] = [
   {
     facts: { notFound: true },
     status: 'invalid',
-    message: '链接无效，或这条分享已被删除。',
+    message: '链接无效，或这条分享已被删除',
     action: { kind: 'directory', label: '回到分享列表' },
   },
   {
     facts: { ownerOnline: false },
     status: 'offline',
-    message: '分享者当前不在线，会自动重连。',
+    message: '分享者当前不在线，会自动重连',
     action: { kind: 'retry', label: '重试' },
   },
   {
     facts: { reason: 'share-stopped' },
     status: 'stopped',
-    message: '分享者已停止这条分享。',
+    message: '分享者已停止这条分享',
     action: { kind: 'directory', label: '回到分享列表' },
   },
   {
     facts: { reason: 'share-expired' },
     status: 'expired',
-    message: '这条分享已过期。',
+    message: '这条分享已过期',
     action: { kind: 'directory', label: '回到分享列表' },
   },
   {
@@ -72,7 +72,7 @@ const ROWS: readonly StatusRow[] = [
   {
     facts: { unreachable: true },
     status: 'unavailable',
-    message: '服务暂时不可用，正在重试。',
+    message: '服务暂时不可用，正在重试',
     action: { kind: 'reload', label: '刷新' },
   },
 ]
@@ -192,7 +192,7 @@ describe('viewer status', () => {
     await fiber.await()
     try {
       await vi.waitFor(() => {
-        expect(document.getElementById(MESSAGE_ID)?.textContent).toBe('分享者当前不在线，会自动重连。')
+        expect(document.getElementById(MESSAGE_ID)?.textContent).toBe('分享者当前不在线，会自动重连')
       })
 
       // The statement is plain DOM rather than a slot-rendered surface, so a language switch repaints
@@ -200,7 +200,7 @@ describe('viewer status', () => {
       locale.setLocale('en')
       await vi.waitFor(() => {
         expect(document.getElementById(MESSAGE_ID)?.textContent)
-          .toBe('The owner is offline right now; this page reconnects automatically.')
+          .toBe('The owner is offline right now; this page reconnects automatically')
       })
       locale.setLocale('zh')
 
@@ -208,14 +208,14 @@ describe('viewer status', () => {
       context = { capabilities: { sessionMode: 'view', sessionModeReason: 'share-stopped', online: true } }
       await act(async () => { window.dispatchEvent(new Event('focus')) })
       await vi.waitFor(() => {
-        expect(document.getElementById(MESSAGE_ID)?.textContent).toBe('分享者已停止这条分享。')
+        expect(document.getElementById(MESSAGE_ID)?.textContent).toBe('分享者已停止这条分享')
       })
 
       // A reader the Relay does not know: the link is the thing to check, and the page says so.
       notFound = true
       await act(async () => { window.dispatchEvent(new Event('focus')) })
       await vi.waitFor(() => {
-        expect(document.getElementById(MESSAGE_ID)?.textContent).toBe('链接无效，或这条分享已被删除。')
+        expect(document.getElementById(MESSAGE_ID)?.textContent).toBe('链接无效，或这条分享已被删除')
       })
     } finally {
       await fiber.dispose()

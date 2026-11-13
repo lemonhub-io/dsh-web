@@ -37,8 +37,8 @@ const translate: LiveshareShareDialogProps['t'] = (key, params) => {
 /** The address this deployment's host names, and the one the account is verified on. */
 const RELAY = DOUBLE_RELAY
 const OTHER = 'https://other.example.test'
-const UNSAVED = 'This address is not saved yet; save it to put it in force.'
-const UNREACHABLE = 'Cannot reach the DSH Liveshare share service.'
+const UNSAVED = 'This address is not saved yet; save it to put it in force'
+const UNREACHABLE = 'Cannot reach the DSH Liveshare share service'
 
 type MaybeAsync<T> = T | Promise<T>
 

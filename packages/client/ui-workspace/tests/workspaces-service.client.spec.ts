@@ -948,10 +948,10 @@ describe('UiWorkspaceService', () => {
         if (failure === 'missing binding') b.sessions.binding.mockReturnValueOnce(undefined)
 
         b.uiWorkspace.startSession(wid('a'), { prompt: 'unsent' })
-        await expect(lastOpening(opening)).rejects.toThrow('Could not fill the draft. Please try again shortly')
+        await expect(lastOpening(opening)).rejects.toThrow('Could not fill the draft Please try again shortly')
 
         expect(b.notify).toHaveBeenCalledExactlyOnceWith({
-          kind: 'createFailed', message: 'Could not fill the draft. Please try again shortly',
+          kind: 'createFailed', message: 'Could not fill the draft Please try again shortly',
         })
         expect(warning).toHaveBeenCalledExactlyOnceWith('new session failed:', expect.any(Error))
         expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()

@@ -389,7 +389,7 @@ it.each([
           // A directory prevents atomic file replacement on every supported filesystem.
           await mkdir(preferencePath)
           await page.keyboard.press('j')
-          await dialog.getByText('Could not save. Your previous shortcuts and current draft are preserved. Please retry', { exact: true }).waitFor()
+          await dialog.getByText('Could not save Your previous shortcuts and current draft are preserved Please retry', { exact: true }).waitFor()
           expect(snapshot.document).toEqual(accepted)
           expect(await recorder.getAttribute('aria-invalid')).toBe('true')
           expect(await recorder.evaluate(node => node === document.activeElement)).toBe(true)

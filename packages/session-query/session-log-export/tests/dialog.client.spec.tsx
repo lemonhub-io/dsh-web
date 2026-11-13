@@ -126,7 +126,7 @@ describe('SessionLogDownloadDialog', () => {
         [SID]: { order: 0, open: true, status: 'error', error: '' },
       } })
     })
-    expect(b.view.getByRole('dialog').textContent).toContain('Could not start the Session export.')
+    expect(b.view.getByRole('dialog').textContent).toContain('Could not start the Session export')
     b.view.rerender(<SessionLogDownloadDialog {...b.props} t={makeTranslate(zh)} />)
     expect(b.view.getByRole('dialog').textContent).toContain(`Session：${SID}`)
     expect(b.view.getByRole('dialog').textContent).toContain(zh['dialog.commandFailed'])

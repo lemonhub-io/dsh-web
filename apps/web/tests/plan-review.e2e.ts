@@ -211,7 +211,7 @@ describe('web e2e: plan review takeover round trip', () => {
       await card.waitFor({ state: 'detached' })
       expect(await preview.getByText('Ask before implementation.').isVisible()).toBe(true)
       await page.reload({ waitUntil: 'load' })
-      await page.getByText('This temporary plan preview has expired. Reopen it from the pending review card', { exact: true }).waitFor()
+      await page.getByText('This temporary plan preview has expired Reopen it from the pending review card', { exact: true }).waitFor()
       expect(tripwire.pageErrors).toEqual([])
       expect(tripwire.warnings).toEqual([])
     } finally {

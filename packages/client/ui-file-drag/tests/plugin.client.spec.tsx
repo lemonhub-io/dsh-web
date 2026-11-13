@@ -67,8 +67,8 @@ it('retains bytes after source unmount and releases on the detached node dragend
 
 it.each([
   ['zh', '拖放失败，请重试'],
-  ['en', 'Drag failed. Try again'],
-  ['ja', 'ドラッグ＆ドロップに失敗しました。もう一度お試しください'],
+  ['en', 'Drag failed Try again'],
+  ['ja', 'ドラッグ＆ドロップに失敗しました もう一度お試しください'],
 ] as const)('reports a late native failure after source unmount in %s', async (language, message) => {
   const pending = Promise.withResolvers<boolean>()
   const handle = 'handle' as FileDragHandle

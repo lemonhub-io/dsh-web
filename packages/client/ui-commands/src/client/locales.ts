@@ -103,7 +103,7 @@ export const ja = {
   'status.empty': 'オプションなし',
   'overlay.aria': '/{command} のオプション',
   'listbox.aria': '/{command} の一致項目',
-  'notice.attachmentsUnsupported': '/{command} は添付ファイルを受け付けません。先に削除してください',
+  'notice.attachmentsUnsupported': '/{command} は添付ファイルを受け付けません 先に削除してください',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */

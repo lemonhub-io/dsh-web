@@ -83,7 +83,7 @@ export async function cordisCommunityScenario(
   await context.route('https://api.github.com/**', async (route) => {
     const url = new URL(route.request().url())
     let body: object | undefined
-    if (url.pathname === '/search/repositories' && url.searchParams.get('q')?.includes('topic:dsh-web-plugin')) {
+    if (url.pathname === '/search/repositories' && url.searchParams.get('q')?.includes('topic:dsh-plugin')) {
       if (rateLimited) {
         await route.fulfill({ status: 429, headers: { ...cors, 'x-ratelimit-remaining': '0' }, body: '{}' })
         return

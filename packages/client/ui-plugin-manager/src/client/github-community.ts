@@ -88,7 +88,7 @@ export async function discoverGitHub(query: string, signal: AbortSignal): Promis
   }
   target = query.trim()
   const search = new URLSearchParams({
-    q: `${target} topic:dsh-web-plugin archived:false`,
+    q: `${target} topic:dsh-plugin archived:false`,
     per_page: '24',
     sort: 'updated',
   })

@@ -791,7 +791,7 @@ describe('web e2e: plugin manager', () => {
     await info.hover()
     const hoverHelp = page.getByRole('tooltip')
     await hoverHelp.waitFor()
-    expect(await hoverHelp.textContent()).toBe('在这里配置官方插件，安装和管理其他插件。内置插件列表及运行状态可在「设置 → 内置插件」中查看')
+    expect(await hoverHelp.textContent()).toBe('在这里配置官方插件，安装和管理其他插件 内置插件列表及运行状态可在「设置 → 内置插件」中查看')
     await panel.getByRole('heading', { name: '插件', exact: true }).hover()
     await hoverHelp.waitFor({ state: 'hidden' })
     await info.focus()
@@ -1154,7 +1154,7 @@ describe('web e2e: plugin manager', () => {
     await panel.getByRole('button', { name: '查看 语音输入', exact: true }).click()
     const packageName = panel.locator('[data-plugin-name]')
     expect(await packageName.textContent()).toBe('@deepseek-ai/dsh-experimental-voice-input-bundle')
-    expect(await panel.getByText('在本机使用 SenseVoice 转写录音，首次使用需安装依赖。').count()).toBe(1)
+    expect(await panel.getByText('在本机使用 SenseVoice 转写录音，首次使用需安装依赖').count()).toBe(1)
     try {
       await setLanguage('en')
       await panel.getByRole('heading', { name: 'Voice input', exact: true }).waitFor()
@@ -1409,7 +1409,7 @@ describe('web e2e: plugin manager', () => {
     await field.fill('@fixture/bundle')
     await install.click()
     await dialog.getByRole('alert').waitFor({ timeout: 5_000 })
-    expect(await dialog.getByRole('alert').textContent()).toBe('该插件已安装。如需升级，请卸载后重新安装')
+    expect(await dialog.getByRole('alert').textContent()).toBe('该插件已安装 如需升级，请卸载后重新安装')
     // A path the Host cannot read as a package is refused with its reason, and the spec stays editable.
     await field.fill(join(scaffold.harnessHome, 'no-such-plugin'))
     await install.click()

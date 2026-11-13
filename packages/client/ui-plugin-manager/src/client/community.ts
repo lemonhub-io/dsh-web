@@ -4,7 +4,7 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import { CommunityPage, type CommunityFace } from './CommunityPage.tsx'
 import { communityEn, communityZh } from './community-locales.ts'
-import { PluginsPanelIcon } from './PluginsPanelIcon.tsx'
+import { CommunityPanelIcon } from './CommunityPanelIcon.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -37,5 +37,5 @@ export function apply(ctx: Context): void {
     openManager: () => { ctx.get('pluginNavigation')?.openList() },
   }
   ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: panel, locale: 'pluginCommunity', inject: () => face }, CommunityPage))
-  ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: panel, order: 1, label: () => t('title'), locale: 'pluginCommunity' }, PluginsPanelIcon))
+  ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: panel, order: 1, label: () => t('title'), locale: 'pluginCommunity' }, CommunityPanelIcon))
 }

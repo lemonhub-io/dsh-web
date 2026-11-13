@@ -61,7 +61,7 @@ export const ja = {
   'unavailable': 'このプラグインは読み込まれていないため、現在設定できません',
   'save': '保存',
   'saving': '保存中',
-  'saveFailed': 'デプロイがこれらの値を受け付けませんでした。修正のために残されています',
+  'saveFailed': 'デプロイがこれらの値を受け付けませんでした 修正のために残されています',
   'invalidNumber': '数値を入力するか、空欄のままにするとデフォルトが使用されます',
 } satisfies Record<keyof typeof en, string>
 
@@ -109,7 +109,7 @@ export const de = {
   unavailable: 'Dieses Plugin ist nicht geladen und kann daher derzeit nicht konfiguriert werden',
   save: 'Speichern',
   saving: 'Speichern',
-  saveFailed: 'Die Bereitstellung hat diese Werte nicht akzeptiert. Sie mussten sie korrigieren',
+  saveFailed: 'Die Bereitstellung hat diese Werte nicht akzeptiert Sie mussten sie korrigieren',
   invalidNumber: 'Geben Sie eine Zahl ein oder lassen Sie das Feld leer, um den Standardwert zu verwenden',
 } satisfies Record<keyof typeof en, string>
 

@@ -430,7 +430,7 @@ it.skipIf(MODE === 'record')('reports incomplete filter configuration and retrie
   await git(project, 'config', key, 'cat')
   await openChanges.click()
   const changes = page.locator('[data-forge-changes="local"]')
-  await changes.getByText('无法完整读取 Git 过滤器配置，尚未执行比较。请检查 Git 配置和读取上限后重试', { exact: true }).waitFor()
+  await changes.getByText('无法完整读取 Git 过滤器配置，尚未执行比较 请检查 Git 配置和读取上限后重试', { exact: true }).waitFor()
   await compareOrRefreshGolden(join(EXPECTED, 'filter-config-failed.expected.md'),
     await captureStableAria(page, '[data-forge-changes="local"]', scaffold.workspaceCwd), MODE)
 

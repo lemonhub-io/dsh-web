@@ -2049,7 +2049,7 @@ describe('desktop main startup', () => {
     await invoke(DESKTOP_IPC.updatesOpen, 'app')
     expect(harness.dialog.showMessageBox).toHaveBeenCalledTimes(2)
     expect(harness.dialog.showMessageBox).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'error',
-      message: 'Could not check for updates. Please try again later', technicalDetails: 'Feed unavailable' }))
+      message: 'Could not check for updates Please try again later', technicalDetails: 'Feed unavailable' }))
     expect(harness.updateDownload).not.toHaveBeenCalled()
   })
 
@@ -2264,7 +2264,7 @@ describe('desktop main startup', () => {
     window.setFullScreen.mockImplementation(() => {})
     const preparing = harness.prepareUpdate()
     const rejected = expect(preparing).rejects.toMatchObject({ kind: 'fullscreen-timeout',
-      message: 'Could not exit fullscreen. Exit fullscreen, then retry the update' })
+      message: 'Could not exit fullscreen Exit fullscreen, then retry the update' })
     await vi.waitFor(() => { expect(window.setFullScreen).toHaveBeenCalledWith(false) })
     await vi.advanceTimersByTimeAsync(5000)
     await rejected

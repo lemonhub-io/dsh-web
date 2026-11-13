@@ -222,7 +222,7 @@ describe('Open in Session menus', () => {
     expect(launches).toHaveLength(1)
     await page.keyboard.press('Escape')
     response.resolve(502)
-    await page.getByText('Could not open. Try again', { exact: true }).waitFor()
+    await page.getByText('Could not open Try again', { exact: true }).waitFor()
     expect(await page.evaluate(() => localStorage.getItem('dsh.open-in-app.choice'))).toBeNull()
     await background.hover()
     await background.getByRole('button', { name: /actions/i }).click()

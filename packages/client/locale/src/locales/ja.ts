@@ -17,7 +17,7 @@ export const ja = {
   'copy.path': 'プロパティパスをコピー',
   'copy.prettyJson': '整形JSONをコピー',
   'copy.compactJson': 'コンパクトJSONをコピー',
-  'copy.optionsHint': '{action}。右クリックでコピーオプションを表示',
+  'copy.optionsHint': '{action} 右クリックでコピーオプションを表示',
   'retry': '再試行',
   'loading': '読み込み中…',
   'load.failed': '読み込みに失敗しました',

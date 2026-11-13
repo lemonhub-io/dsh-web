@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Claude Code subagent",
-    "description": "Delegate one task to Claude Code using its native authentication and settings."
+    "description": "Delegate one task to Claude Code using its native authentication and settings"
   }
 }

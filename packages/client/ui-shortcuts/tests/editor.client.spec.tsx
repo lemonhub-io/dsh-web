@@ -253,7 +253,7 @@ it('requires review when available commands change during recording', async () =
     await f.persistence.readCurrent()
   })
   fireEvent.keyUp(recorder, { code: 'KeyJ' })
-  expect(screen.getAllByText('Shortcut configuration or available commands changed. Review the latest bindings before saving').length).toBeGreaterThan(0)
+  expect(screen.getAllByText('Shortcut configuration or available commands changed Review the latest bindings before saving').length).toBeGreaterThan(0)
   expect(f.storage.write).not.toHaveBeenCalled()
   expect(f.onSaved).not.toHaveBeenCalled()
 })

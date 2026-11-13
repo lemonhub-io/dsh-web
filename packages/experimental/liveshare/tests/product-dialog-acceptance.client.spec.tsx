@@ -249,7 +249,7 @@ describe('Liveshare dialog product acceptance', () => {
     const { popup, open, redeemed } = await showLoginDialog()
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     // The window is reserved inside the gesture, then navigated to exactly the sign-in the host named.
-    await screen.findByText('Finish signing in in the window that opened.')
+    await screen.findByText('Finish signing in in the window that opened')
     expect(open).toHaveBeenCalledWith('', 'liveshare-owner-login', 'popup=yes,width=520,height=720')
     expect(popup.location.href).toBe('https://relay.example.test/__liveshare/auth/start?state=s1')
     // A message from another origin and another window is not this attempt's answer: it is dropped,
@@ -270,7 +270,7 @@ describe('Liveshare dialog product acceptance', () => {
       data: { type: 'liveshare-auth-code', code: 'stolen', state: 'stale' },
     })
     expect(redeemed()).toBeUndefined()
-    expect(screen.getByText('Finish signing in in the window that opened.')).toBeDefined()
+    expect(screen.getByText('Finish signing in in the window that opened')).toBeDefined()
     // The popup's own message for the state the host minted is submitted, with its state, and the
     // sign-in page is acknowledged on the origin the host bound.
     deliverMessage({
@@ -297,7 +297,7 @@ describe('Liveshare dialog product acceptance', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign in again' }))
     // The same transaction an unverified owner gets, and the row still states the identity in force
     // until the host redeems the new credential.
-    await screen.findByText('Finish signing in in the window that opened.')
+    await screen.findByText('Finish signing in in the window that opened')
     expect(open).toHaveBeenCalledOnce()
     expect(popup.location.href).toBe('https://relay.example.test/__liveshare/auth/start?state=s1')
     expect(screen.getByText('许翰翔')).toBeDefined()
@@ -437,11 +437,11 @@ describe('Liveshare dialog product acceptance', () => {
     await showDialog(200, false, () => {}, existing, undefined, {
       state: 'expired', relay: RELAY, subjectId: 'feishu:tenant:ou_9f2c4d',
     })
-    expect(await screen.findByText('Your sign-in has expired. Sign in again before creating a share.')).toBeDefined()
+    expect(await screen.findByText('Your sign-in has expired Sign in again before creating a share')).toBeDefined()
     const create = screen.getByRole('button', { name: 'Create share' })
     expect(create).toHaveProperty('disabled', true)
     // The disabled action states the same reason the row does, in the identity's own words.
-    expect(create.getAttribute('title')).toBe('Your sign-in has expired. Sign in again before creating a share.')
+    expect(create.getAttribute('title')).toBe('Your sign-in has expired Sign in again before creating a share')
     // The control starts the host's own transaction rather than naming a Relay entry from here.
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeDefined()
   })
@@ -453,7 +453,7 @@ describe('Liveshare dialog product acceptance', () => {
       displayName: '许翰翔',
     })
     expect(await screen.findByText(
-      'The current sign-in belongs to another Relay address. Sign in again on this address.',
+      'The current sign-in belongs to another Relay address Sign in again on this address',
     )).toBeDefined()
     expect(screen.getByRole('button', { name: 'Create share' })).toHaveProperty('disabled', true)
   })
@@ -471,7 +471,7 @@ describe('Liveshare dialog product acceptance', () => {
     const pending = Promise.withResolvers<OwnerIdentityStatus>()
     await showDialog(200, false, () => {}, existing, undefined, undefined, pending.promise)
     expect(await screen.findByText(
-      'Sign-in status is unavailable right now. Try again later; no share is created before you sign in.',
+      'Sign-in status is unavailable right now Try again later; no share is created before you sign in',
     )).toBeDefined()
     // Nothing may submit on an unread status, and the handler refuses even if the button is reached.
     expect(screen.getByRole('button', { name: 'Create share' })).toHaveProperty('disabled', true)
@@ -489,7 +489,7 @@ describe('Liveshare dialog product acceptance', () => {
       state: 'relay-unsupported', relay: RELAY,
     })
     expect(await screen.findByText(
-      'The Relay at this address does not verify identities yet. Upgrade it before creating a share; this page will not create an anonymous one.',
+      'The Relay at this address does not verify identities yet Upgrade it before creating a share; this page will not create an anonymous one',
     )).toBeDefined()
     expect(screen.getByRole('button', { name: 'Create share' })).toHaveProperty('disabled', true)
     // Verification cannot succeed against a Relay that does not support it, so no such call to action.
@@ -521,7 +521,7 @@ describe('Liveshare dialog product acceptance', () => {
     try {
       const { open, popup } = await showLoginDialog()
       fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-      await screen.findByText('Finish signing in in the window that opened.')
+      await screen.findByText('Finish signing in in the window that opened')
       // The window this page reserved carries nothing of its own, and the sign-in it navigates to is
       // the one the host named: neither this page's address, its parameters, nor an Owner startup
       // token travels to the Relay.
@@ -662,12 +662,12 @@ describe('Liveshare dialog product acceptance', () => {
     expect(screen.getByText('Selected people confirmed: 1.')).toBeDefined()
     // A share that still carries the retired scope keeps it, and says so: nothing widens it to the
     // open link.
-    expect(screen.getByText('Deployment-authorized identities: 1. Selection is not the only access rule.')).toBeDefined()
+    expect(screen.getByText('Deployment-authorized identities: 1. Selection is not the only access rule')).toBeDefined()
   })
 
   it('honestly marks a legacy share whose access summary was never persisted', async () => {
     await showDialog(200, true, () => {}, { ...existing, access: undefined })
-    expect(screen.getByText('Access details for this share are unavailable. Existing permissions are unchanged.')).toBeDefined()
+    expect(screen.getByText('Access details for this share are unavailable Existing permissions are unchanged')).toBeDefined()
   })
 
   it('traps dialog focus and closes candidates before the modal on Escape', async () => {

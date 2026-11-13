@@ -26,7 +26,7 @@ export const en = {
   rendering: 'Rendering page',
   failed: 'Cannot display PDF: {message}',
   password: 'This PDF requires a password; password-protected previews are not supported',
-  workerFailed: 'The PDF rendering process could not continue. Please retry',
+  workerFailed: 'The PDF rendering process could not continue Please retry',
   unsupported: 'PDF preview requires the complete file contents',
   retry: 'Retry',
 } satisfies Record<PdfLocaleKey, string>
@@ -46,8 +46,8 @@ export const ja = {
   'loading': 'ドキュメントをレンダリング中',
   'rendering': 'ページをレンダリング中',
   'failed': 'PDFを表示できません: {message}',
-  'password': 'このPDFにはパスワードが必要です。パスワード保護されたプレビューはサポートされていません',
-  'workerFailed': 'PDFのレンダリング処理を続行できませんでした。再試行してください',
+  'password': 'このPDFにはパスワードが必要です パスワード保護されたプレビューはサポートされていません',
+  'workerFailed': 'PDFのレンダリング処理を続行できませんでした 再試行してください',
   'unsupported': 'PDFのプレビューには完全なファイル内容が必要です',
   'retry': '再試行',
 } satisfies Record<keyof typeof en, string>
@@ -61,7 +61,7 @@ export const es = {
   rendering: 'Página de renderizado',
   failed: 'No se puede mostrar PDF: {message}',
   password: 'Este PDF requiere una contraseña; No se admiten vistas previas protegidas con contraseña',
-  workerFailed: 'El proceso de renderizado de PDF no pudo continuar. Vuelva a intentarlo',
+  workerFailed: 'El proceso de renderizado de PDF no pudo continuar Vuelva a intentarlo',
   unsupported: 'La vista previa de PDF requiere el contenido completo del archivo',
   retry: 'Reintentar',
 } satisfies Record<keyof typeof en, string>
@@ -75,7 +75,7 @@ export const fr = {
   rendering: 'Page de rendu',
   failed: "Impossible d'afficher le PDF : {message}",
   password: 'Ce PDF nécessite un mot de passe ; les aperçus protégés par mot de passe ne sont pas pris en charge',
-  workerFailed: "Le processus de rendu PDF n'a pas pu continuer. Veuillez réessayer",
+  workerFailed: "Le processus de rendu PDF n'a pas pu continuer Veuillez réessayer",
   unsupported: "L'aperçu PDF nécessite le contenu complet du fichier",
   retry: 'Réessayer',
 } satisfies Record<keyof typeof en, string>
@@ -88,8 +88,8 @@ export const de = {
   loading: 'Dokument wird gerendert',
   rendering: 'Rendering-Seite',
   failed: 'PDF kann nicht angezeigt werden: {message}',
-  password: 'Für dieses PDF ist ein Passwort erforderlich. Passwortgeschützte Vorschauen werden nicht unterstützt',
-  workerFailed: 'Der PDF-Rendering-Prozess konnte nicht fortgesetzt werden. Bitte versuchen Sie es erneut',
+  password: 'Für dieses PDF ist ein Passwort erforderlich Passwortgeschützte Vorschauen werden nicht unterstützt',
+  workerFailed: 'Der PDF-Rendering-Prozess konnte nicht fortgesetzt werden Bitte versuchen Sie es erneut',
   unsupported: 'Für die PDF-Vorschau ist der vollständige Dateiinhalt erforderlich',
   retry: 'Erneut versuchen',
 } satisfies Record<keyof typeof en, string>
@@ -103,7 +103,7 @@ export const ru = {
   rendering: 'Отображение страницы',
   failed: 'Невозможно отобразить PDF: {message}',
   password: 'Для этого PDF-файла требуется пароль; предварительный просмотр, защищенный паролем, не поддерживается',
-  workerFailed: 'Процесс рендеринга PDF не может быть продолжен. Пожалуйста, повторите попытку',
+  workerFailed: 'Процесс рендеринга PDF не может быть продолжен Пожалуйста, повторите попытку',
   unsupported: 'Для предварительного просмотра PDF требуется полное содержимое файла',
   retry: 'Повторить',
 } satisfies Record<keyof typeof en, string>
@@ -117,7 +117,7 @@ export const pt = {
   rendering: 'Página de renderização',
   failed: 'Não é possível exibir PDF: {message}',
   password: 'Este PDF requer uma senha; visualizações protegidas por senha não são suportadas',
-  workerFailed: 'O processo de renderização do PDF não pôde continuar. Por favor, tente novamente',
+  workerFailed: 'O processo de renderização do PDF não pôde continuar Por favor, tente novamente',
   unsupported: 'A visualização do PDF requer o conteúdo completo do arquivo',
   retry: 'Tentar novamente',
 } satisfies Record<keyof typeof en, string>

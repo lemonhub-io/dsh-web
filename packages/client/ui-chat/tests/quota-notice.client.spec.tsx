@@ -154,11 +154,11 @@ describe('frame-wide quota notices', () => {
     await b.runtime.sessions.appendEvent(SID, quotaEntry(0, 'ACCOUNT_QUOTA'))
     // Wait for the committed notice rather than assuming the store write has
     // already reached React.
-    expect((await screen.findByRole('alert')).textContent).toBe('Request quota exhausted.')
+    expect((await screen.findByRole('alert')).textContent).toBe('Request quota exhausted')
     // Switching away releases the binding and stops new notices, but the live
     // notice is host state, so it stays on screen.
     reference.release()
-    expect(screen.getByRole('alert').textContent).toBe('Request quota exhausted.')
+    expect(screen.getByRole('alert').textContent).toBe('Request quota exhausted')
     act(() => { noticeFace(b.runtime).dismissNotice() })
     expect(screen.queryByRole('alert')).toBeNull()
   })

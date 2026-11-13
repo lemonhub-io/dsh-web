@@ -77,8 +77,8 @@ export const en = {
 export const ja = {
   'error.incomplete': '先にこの質問に回答してください',
   'error.unanswered': 'オプションを選択するか、カスタム回答を入力してください',
-  'error.unavailable': '現在送信できません。しばらくしてからもう一度お試しください',
-  'error.resubmit': '作業が続行される前に回答が届きませんでした。もう一度送信してください',
+  'error.unavailable': '現在送信できません しばらくしてからもう一度お試しください',
+  'error.resubmit': '作業が続行される前に回答が届きませんでした もう一度送信してください',
   'status.sent': '返信は送信されましたが、パネルを閉じられませんでした',
   'wait.takeTime': '時間をかける',
   'wait.countdown': '{seconds}秒後に続行',

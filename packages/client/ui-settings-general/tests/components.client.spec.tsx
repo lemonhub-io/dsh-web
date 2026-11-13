@@ -229,7 +229,7 @@ it('reports a failed developer-tool write and allows retry', async () => {
   render(<DeveloperToolsRow {...kit} t={t} useDeveloperTools={bindSnapshotSelector(state)} setEnabled={setEnabled} />)
   const toggle = screen.getByRole('switch', { name: 'Show coding view' })
   fireEvent.click(toggle)
-  expect((await screen.findByRole('alert')).textContent).toBe('Could not save. Please try again')
+  expect((await screen.findByRole('alert')).textContent).toBe('Could not save Please try again')
   expect(toggle.hasAttribute('disabled')).toBe(false)
   expect(toggle.getAttribute('aria-checked')).toBe('false')
   fireEvent.click(toggle)

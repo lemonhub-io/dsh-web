@@ -98,7 +98,7 @@ describe('Assembled liveshare viewer page branching a share', () => {
       expect(document.querySelector('[data-sample="bash"]')).not.toBeNull()
     }, { timeout: 30_000 })
     expect(document.querySelector('[contenteditable="true"]')).toBeNull()
-    expect(document.body.textContent).toContain('Read only: you can drive this Session, but you read files inside the share’s scope only and modify nothing.')
+    expect(document.body.textContent).toContain('Read only: you can drive this Session, but you read files inside the share’s scope only and modify nothing')
     // The read-only page offers no way to change the shared Session's own settings.
     expect(screen.queryByRole('button', { name: /^Access mode/u })).toBeNull()
     // Reordering Sessions and Workspaces is the same Host state rename and delete write, so no row on
@@ -212,7 +212,7 @@ describe('Assembled liveshare viewer page branching a share', () => {
     await waitFor(() => {
       expect(document.querySelector('[contenteditable="true"]')).toBeNull()
     }, { timeout: 15_000 })
-    expect(document.body.textContent).toContain('Read only: you can drive this Session, but you read files inside the share’s scope only and modify nothing.')
+    expect(document.body.textContent).toContain('Read only: you can drive this Session, but you read files inside the share’s scope only and modify nothing')
     expect(screen.queryAllByRole('button', { name: 'Branch into a new conversation' })).toHaveLength(0)
 
     // The owner allows branching again: the page follows the answer it now holds rather than the one

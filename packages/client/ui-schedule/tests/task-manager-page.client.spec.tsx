@@ -403,11 +403,11 @@ function remoteCatalog() {
 
 describe.each([['English', en], ['Chinese', zh]] as const)('original Session availability in %s', (_name, dictionary) => {
   it.each([
-    ['Session list pending', { ...sessions, phase: 'pending' as const }, workspaces, 'Loading linked session information.', '正在加载关联会话信息'],
-    ['Workspace list pending', sessions, { ...workspaces, phase: 'pending' as const }, 'Loading linked session information.', '正在加载关联会话信息'],
-    ['archived', sessions, { ...workspaces, archivedSessionIds: [alpha] }, 'The linked session is archived.', '关联会话已归档'],
-    ['missing', { ...sessions, ids: [], byId: {} }, workspaces, 'The linked session is unavailable.', '关联会话当前不可用'],
-    ['archive read failed', sessions, { ...workspaces, state: 'error' as const, error: new RemoteError('gateway/internal', 'Archive unavailable', {}) }, 'The linked session is unavailable.', '关联会话当前不可用'],
+    ['Session list pending', { ...sessions, phase: 'pending' as const }, workspaces, 'Loading linked session information', '正在加载关联会话信息'],
+    ['Workspace list pending', sessions, { ...workspaces, phase: 'pending' as const }, 'Loading linked session information', '正在加载关联会话信息'],
+    ['archived', sessions, { ...workspaces, archivedSessionIds: [alpha] }, 'The linked session is archived', '关联会话已归档'],
+    ['missing', { ...sessions, ids: [], byId: {} }, workspaces, 'The linked session is unavailable', '关联会话当前不可用'],
+    ['archive read failed', sessions, { ...workspaces, state: 'error' as const, error: new RemoteError('gateway/internal', 'Archive unavailable', {}) }, 'The linked session is unavailable', '关联会话当前不可用'],
   ] satisfies [string, SessionListState, WorkspaceSnapshot, string, string][])('disables navigation while %s without hiding the task', (_reason, sessionState, workspaceState, english, chinese) => {
     const { props } = mount({ records: [ended] }, dictionary, {
       useSessions: select => select(sessionState), useWorkspaces: select => select(workspaceState),

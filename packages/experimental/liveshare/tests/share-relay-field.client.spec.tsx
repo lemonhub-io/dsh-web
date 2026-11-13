@@ -185,7 +185,7 @@ describe('Liveshare relay URL field', () => {
     expect(screen.getByRole('switch', { name: en['dialog.allowsFork'] })).toHaveProperty('disabled', true)
     expect(screen.getByText(en['dialog.expiry.never'])).toBeDefined()
     // The flow states the address step and why it blocks, rather than a reason this page invented.
-    expect(screen.getByRole('status').textContent).toBe('This address is not saved yet; save it to put it in force.')
+    expect(screen.getByRole('status').textContent).toBe('This address is not saved yet; save it to put it in force')
   })
 
   it('lets verification resume once the saved address answers', async () => {

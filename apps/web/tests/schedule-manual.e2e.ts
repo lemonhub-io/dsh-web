@@ -7,9 +7,9 @@ import { writeComposerDraft } from './support.ts'
 
 it.each([
   { locale: 'en', panel: 'Automation tasks', create: 'New', menu: 'Choose a creation method', chat: 'Create in a session',
-    prompt: 'Please create an automation task based on the requirements.' },
+    prompt: 'Please create an automation task based on the requirements' },
   { locale: 'zh', panel: '自动化任务', create: '新建', menu: '选择创建方式', chat: '在会话中创建',
-    prompt: '请根据需求创建一个自动化任务。' },
+    prompt: '请根据需求创建一个自动化任务' },
 ])('prefills an unsent Schedule creation draft in $locale through both conversation entries', async (copy) => {
   const scaffold = await launchWebScaffold({ firstUse: true })
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined

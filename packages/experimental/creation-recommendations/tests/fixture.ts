@@ -21,7 +21,7 @@ export const ACTION = 'create_personalized_page'
 /** Text of an accepted `create_personalized_page` call's result. */
 export const RESULT_TEXT = 'Card shown below your answer. Do not restate it. End with at most one short invitation in the user’s language, in the first '
   + 'person: after they click Create below, you will build it in the background as a plugin page that stays available, without blocking the chat; '
-  + 'the build takes minutes and many tokens.'
+  + 'the build takes minutes and many tokens'
 export const callId = ToolCallId('call-creation-1')
 export const proposal = { title: 'Counter', brief: 'Keep a counter visible for this task.', details: { slot: 'sidebar-right' as const } }
 

@@ -94,7 +94,7 @@ it('claims account balance notices from the frame-wide quota chain and declines 
   expect(entry).toBeDefined()
   const select = entry!.select! as (owner: QuotaNoticeOwnerProps) => QuotaNoticeOwnerProps | null
   const notice: QuotaNoticeOwnerProps = {
-    code: 'ACCOUNT_QUOTA', message: 'Request quota exhausted.', dismiss: vi.fn(), keepOpen: vi.fn(() => () => {}),
+    code: 'ACCOUNT_QUOTA', message: 'Request quota exhausted', dismiss: vi.fn(), keepOpen: vi.fn(() => () => {}),
   }
   expect(select(notice)).toBe(notice)
   expect(select({ ...notice, code: 'QUOTA' })).toBeNull()

@@ -563,7 +563,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
     await scaffold.ctx.workspaceRegistry.archiveSession(afterHandle.agent.id)
     try {
       await expect.poll(() => linkedSession.isDisabled(), { timeout: 15_000 }).toBe(true)
-      expect(await detail.getByText('The linked session is archived.', { exact: true }).count()).toBe(1)
+      expect(await detail.getByText('The linked session is archived', { exact: true }).count()).toBe(1)
       expect(await detail.getByText('Scheduled After follow-up', { exact: true }).count()).toBe(1)
       const moreActions = detail.getByRole('button', { name: 'Automation task actions', exact: true })
       await moreActions.click()
@@ -907,7 +907,7 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
     // raised it. The Host removed the row with its saved records, so neither the
     // rule view nor the records view can read the task again.
     await expect.poll(() => details.count()).toBe(0)
-    await page.getByText('Task deleted.', { exact: true }).waitFor({ timeout: 15_000 })
+    await page.getByText('Task deleted', { exact: true }).waitFor({ timeout: 15_000 })
     expect(scaffold.ctx.agents.get(otherSessionId)).toBeUndefined()
 
     await manager.getByRole('searchbox', { name: 'Search tasks' }).fill('Check exact cadence')
@@ -1224,7 +1224,7 @@ describe.skipIf(MODE === 'record')('web e2e: active Schedule catalog', () => {
 
         Each task keeps up to 200 delivery records from the last 30 days.
 
-        When a new record is saved, older records outside these limits are cleared automatically. Clearing records does not stop the task."
+        When a new record is saved, older records outside these limits are cleared automatically Clearing records does not stop the task"
       `)
       await info.click()
       expect(await bounds.count()).toBe(0)

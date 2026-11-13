@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 /** Notice copy supplied by the Chat-owned host; this entry never restates it. */
-const noticeMessage = 'Request quota exhausted.'
+const noticeMessage = 'Request quota exhausted'
 
 function snapshot(status?: 'signed-out' | 'credential-stored'): AccountSnapshot {
   const view: AccountView = { status: status ?? 'signed-out', attempt: null, links: { usageUrl: '', topUpUrl: '' } }

@@ -156,7 +156,7 @@ export const ja = {
   'sidebar.chat': 'チャット',
   'readonly.oneShot.title': '単発サブエージェントの記録',
   'readonly.title': 'このサブエージェントは現在読み取り専用です',
-  'readonly.oneShot.body': '単発タスクは追加のメッセージを受け付けません。ここで実行記録の全体を確認できます',
+  'readonly.oneShot.body': '単発タスクは追加のメッセージを受け付けません ここで実行記録の全体を確認できます',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */

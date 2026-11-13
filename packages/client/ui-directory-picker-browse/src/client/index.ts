@@ -47,7 +47,7 @@ export function apply(ctx: ClientContext): void {
         'browser.open': '打开',
         'browser.editPath': '编辑路径',
         'browser.loading': '加载中…',
-        'browser.truncated': '文件夹过多，仅显示开头部分。',
+        'browser.truncated': '文件夹过多，仅显示开头部分',
         'browser.showHidden': '显示隐藏文件',
       }],
       ['en', {
@@ -62,7 +62,7 @@ export function apply(ctx: ClientContext): void {
         'browser.open': 'Open',
         'browser.editPath': 'Edit path',
         'browser.loading': 'Loading…',
-        'browser.truncated': 'Too many folders to list; only the beginning is shown.',
+        'browser.truncated': 'Too many folders to list; only the beginning is shown',
         'browser.showHidden': 'Show hidden files',
       }],
       ['ja', {
@@ -77,7 +77,7 @@ export function apply(ctx: ClientContext): void {
         'browser.open': '開く',
         'browser.editPath': 'パスを編集',
         'browser.loading': '読み込み中…',
-        'browser.truncated': 'フォルダが多すぎて一覧表示できません。先頭のみ表示しています。',
+        'browser.truncated': 'フォルダが多すぎて一覧表示できません 先頭のみ表示しています',
         'browser.showHidden': '隠しファイルを表示',
       }],
       ['es', {
@@ -92,7 +92,7 @@ export function apply(ctx: ClientContext): void {
         'browser.open': 'Abrir',
         'browser.editPath': 'Editar ruta',
         'browser.loading': 'Cargando…',
-        'browser.truncated': 'Hay demasiadas carpetas; solo se muestra el principio.',
+        'browser.truncated': 'Hay demasiadas carpetas; solo se muestra el principio',
         'browser.showHidden': 'Mostrar archivos ocultos',
       }],
       ['fr', {
@@ -107,7 +107,7 @@ export function apply(ctx: ClientContext): void {
         'browser.open': 'Ouvrir',
         'browser.editPath': 'Modifier le chemin',
         'browser.loading': 'Chargement…',
-        'browser.truncated': 'Trop de dossiers à afficher ; seul le début est affiché.',
+        'browser.truncated': 'Trop de dossiers à afficher ; seul le début est affiché',
         'browser.showHidden': 'Afficher les fichiers cachés',
       }],
       ['de', {
@@ -122,7 +122,7 @@ export function apply(ctx: ClientContext): void {
         'browser.open': 'Öffnen',
         'browser.editPath': 'Pfad bearbeiten',
         'browser.loading': 'Laden…',
-        'browser.truncated': 'Zu viele Ordner; nur der Anfang wird angezeigt.',
+        'browser.truncated': 'Zu viele Ordner; nur der Anfang wird angezeigt',
         'browser.showHidden': 'Versteckte Dateien anzeigen',
       }],
       ['ru', {
@@ -137,7 +137,7 @@ export function apply(ctx: ClientContext): void {
         'browser.open': 'Открыть',
         'browser.editPath': 'Изменить путь',
         'browser.loading': 'Загрузка…',
-        'browser.truncated': 'Папок слишком много; показана только начальная часть списка.',
+        'browser.truncated': 'Папок слишком много; показана только начальная часть списка',
         'browser.showHidden': 'Показать скрытые файлы',
       }],
       ['pt', {
@@ -152,7 +152,7 @@ export function apply(ctx: ClientContext): void {
         'browser.open': 'Abrir',
         'browser.editPath': 'Editar caminho',
         'browser.loading': 'Carregando…',
-        'browser.truncated': 'Há pastas demais; apenas o início é exibido.',
+        'browser.truncated': 'Há pastas demais; apenas o início é exibido',
         'browser.showHidden': 'Mostrar arquivos ocultos',
       }],
     ]

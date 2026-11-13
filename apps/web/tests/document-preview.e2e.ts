@@ -1311,7 +1311,7 @@ else process.exit(1);
     ].join('\n'))
 
     const officeMenus: number[] = []
-    const configurationGuide = 'Read failed: Office previews are unavailable. Enable the document preview service on the computer running DeepSeek Harness'
+    const configurationGuide = 'Read failed: Office previews are unavailable Enable the document preview service on the computer running DeepSeek Harness'
     for (const extension of ['doc', 'docx', 'ppt', 'pptx']) {
       await openFile(`unavailable.${extension}`)
       expect(await preview.locator('[data-document-viewer-menu]').count()).toBe(0)
@@ -1375,7 +1375,7 @@ else process.exit(1);
     expect(await excel.getByText('Some formulas have no saved result', { exact: false }).count()).toBe(0)
     const formulaWarning = excel.locator('[data-excel-formula-warning]')
     await formulaWarning.hover()
-    await page.getByText('This workbook contains formulas. Displayed results may be missing or inaccurate', { exact: true }).waitFor()
+    await page.getByText('This workbook contains formulas Displayed results may be missing or inaccurate', { exact: true }).waitFor()
     await sheetTabs.getByText('统计看板', { exact: true }).click()
     await expect.poll(() => excel.locator('.fortune-name-box').innerText()).toBe('A1')
     await successShot(page, 'excel-meeting')
@@ -1406,7 +1406,7 @@ else process.exit(1);
       expect(await clipboardTable.locator('img').count()).toBe(0)
       expect(await page.evaluate(() => document.documentElement.dataset.spreadsheetHtml)).toBeUndefined()
     }
-    const invalidExcel = 'This spreadsheet could not be opened. Check its format, contents, or password protection'
+    const invalidExcel = 'This spreadsheet could not be opened Check its format, contents, or password protection'
     for (const extension of ['xls', 'xlsx']) {
       await openFile(`unavailable.${extension}`)
       await preview.getByText(invalidExcel, { exact: true }).waitFor()
@@ -1872,13 +1872,13 @@ describe.skipIf(MODE === 'record')('web e2e: Host Office preview', () => {
       await expect.poll(() => convert.mock.calls.length).toBe(5)
       await preview.getByRole('img', { name: 'PDF page 1', exact: true }).waitFor({ state: 'visible' })
       await openPreviewFile(column, filesTab, preview, 'renamed.docx')
-      await preview.getByText('Read failed: This Office file cannot be previewed. It may be damaged, password protected, or have the wrong extension', { exact: true }).waitFor({ timeout: 30_000 })
+      await preview.getByText('Read failed: This Office file cannot be previewed It may be damaged, password protected, or have the wrong extension', { exact: true }).waitFor({ timeout: 30_000 })
       expect(await preview.locator('[data-textpreview-line]').count()).toBe(0)
       await successShot(page, 'office-invalid')
       expect(convert).toHaveBeenCalledTimes(6)
       for (const extension of ['doc', 'ppt']) {
         await openPreviewFile(column, filesTab, preview, `renamed.${extension}`)
-        await preview.getByText('Read failed: This Office file cannot be previewed. It may be damaged, password protected, or have the wrong extension', { exact: true }).waitFor({ timeout: 30_000 })
+        await preview.getByText('Read failed: This Office file cannot be previewed It may be damaged, password protected, or have the wrong extension', { exact: true }).waitFor({ timeout: 30_000 })
         expect(await preview.locator('[data-textpreview-line]').count()).toBe(0)
       }
       expect(convert).toHaveBeenCalledTimes(8)

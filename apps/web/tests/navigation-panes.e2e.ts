@@ -497,7 +497,7 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     const response = await markdownResponse
     expect(response.status()).toBe(200)
     expect(response.headers()['content-type']).toBe('text/markdown; charset=utf-8')
-    await page.getByText('Session copied as Markdown.', { exact: true }).waitFor({ timeout: 30_000 })
+    await page.getByText('Session copied as Markdown', { exact: true }).waitFor({ timeout: 30_000 })
     expect(await page.evaluate(() => Number(Reflect.get(globalThis, '__dshClipboardWrites')))).toBe(1)
 
     const sourcePath = (await scaffold.ctx.sessionPersistence.stat(SessionId(SEED_ID)))?.location?.path

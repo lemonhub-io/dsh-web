@@ -433,7 +433,7 @@ describe('web e2e: shortcut reference', () => {
       await other.keyboard.press(referenceKey)
       await other.getByRole('button', { name: 'Edit shortcut for Toggle left sidebar', exact: true }).click()
       await other.getByRole('button', { name: 'Remove', exact: true }).click()
-      await editor.getByText('Shortcut configuration or available commands changed. Review the latest bindings before saving', { exact: true }).waitFor()
+      await editor.getByText('Shortcut configuration or available commands changed Review the latest bindings before saving', { exact: true }).waitFor()
       await page.bringToFront()
       await editor.getByRole('button', { name: 'Press a shortcut', exact: true }).focus()
       await page.keyboard.press(`${modifier}+Shift+,`)

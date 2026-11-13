@@ -199,7 +199,7 @@ describe('keyed toolview hole through the real machinery', () => {
 
     expect(view.queryByText('IN')).toBeNull()
     expect(view.getByText('OUT')).toBeTruthy()
-    expect(view.getByText('Tool was not executed. Reason: precise scope was not authorized')).toBeTruthy()
+    expect(view.getByText('Tool was not executed Reason: precise scope was not authorized')).toBeTruthy()
     expect(view.queryByText('Tool execution rejected by user')).toBeNull()
     await b.runtime.dispose()
   })

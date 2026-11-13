@@ -194,7 +194,7 @@ describe.skipIf(MODE === 'record')('web e2e: archiving a running Session stops i
       .toEqual([String(sessionId)])
     await expect.poll(() => page.getByRole('dialog').count()).toBe(0)
     await expect.poll(() => sessionRow().count(), { timeout: 10_000 }).toBe(0)
-    await expect.poll(() => page.getByText('Session stopped and archived.', { exact: false }).count(), { timeout: 10_000 })
+    await expect.poll(() => page.getByText('Session stopped and archived', { exact: false }).count(), { timeout: 10_000 })
       .toBe(1)
 
     // The stop is the user's cancel: the Bash child dies, the turn settles as

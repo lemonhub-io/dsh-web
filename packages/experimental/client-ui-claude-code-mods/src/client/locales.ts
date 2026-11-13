@@ -27,7 +27,7 @@ export const ja = {
   'band': 'Claude Code の改造',
   'pressing': '実行中…',
   'press.failed': 'ボタンが失敗しました: {message}',
-  'press.stale': 'そのボタンは以前の描画のものです。バンドは更新されました',
+  'press.stale': 'そのボタンは以前の描画のものです バンドは更新されました',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */

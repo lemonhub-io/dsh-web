@@ -70,7 +70,7 @@ When the Host attributes a network failure or timeout to a GitHub address and of
 
 ### Plugin community
 
-The preinstalled community discovers public GitHub repositories and installs their ordinary built Cordis packages through the existing Plugin Manager. Search uses the dsh-web-plugin topic and accepts direct repository or package-directory links. Downloads pin a commit and verify Git blob identities. Other ways to install retains catalog, package URL and local archive import. It reuses market index format 1 with optional per-version Web URLs and hashes. Review full host trust before importing a disabled profile dependency; enabling, configuration and removal stay on the Plugins page. Existing Node compatibility and Cordis extension points execute the plugin; no separate SDK or installation database is used. See the [format guide](../../../../apps/web/platform/plugin-community.md).
+The preinstalled community discovers public GitHub repositories and installs their ordinary built Cordis packages through the existing Plugin Manager. Search uses the dsh-plugin topic and accepts direct repository or package-directory links. Downloads pin a commit and verify Git blob identities. Other ways to install retains catalog, package URL and local archive import. It reuses market index format 1 with optional per-version Web URLs and hashes. Review full host trust before importing a disabled profile dependency; enabling, configuration and removal stay on the Plugins page. Existing Node compatibility and Cordis extension points execute the plugin; no separate SDK or installation database is used. See the [format guide](../../../../apps/web/platform/plugin-community.md).
 
 ### Updating a registry bundle
 

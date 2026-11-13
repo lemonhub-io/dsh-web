@@ -164,7 +164,7 @@ it.skipIf(process.platform !== 'darwin')('keeps system requests pending until fr
   expect(await panel.getByText('/fixture/app', { exact: true }).count()).toBe(0)
   expect(await accessibility.getByText('DSH Computer Use.app', { exact: true }).count()).toBe(1)
   expect(await accessibility.textContent()).toContain('In System Settings, allow')
-  expect(await accessibility.textContent()).toContain('to read interface controls, click, and type.')
+  expect(await accessibility.textContent()).toContain('to read interface controls, click, and type')
   expect(await panel.getByRole('group', { name: 'Screen Recording', exact: true }).getByText('DSH Computer Use.app', { exact: true }).count()).toBe(1)
   await expect.poll(() => accessibility.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(1)
   await expect.poll(() => panel.getAttribute('aria-busy')).toBe('false')
