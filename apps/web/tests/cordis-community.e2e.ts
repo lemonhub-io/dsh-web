@@ -35,7 +35,7 @@ it(
       void readFile(new URL(path === '/' ? 'index.html' : path.slice(1), site)).then(
         (bytes) => {
           response.writeHead(200, {
-            'content-type': mime[extname(path)] ?? 'application/octet-stream',
+            'content-type': mime[extname(path === '/' ? 'index.html' : path)] ?? 'application/octet-stream',
             'content-length': bytes.length,
           })
           response.end(bytes)
