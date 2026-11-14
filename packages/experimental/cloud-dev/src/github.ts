@@ -1,11 +1,17 @@
 /** Direct GitHub management requests and gateway-backed artifact and log downloads. */
-import type { CloudJob } from './types.ts'
+import type { CloudDevProblem, CloudJob } from './types.ts'
 
 /** A failure whose message is safe to show to the person running the job. */
 export class CloudDevError extends Error {
+  /**
+   * @param message - English diagnostic for the AI and integrations.
+   * @param status - GitHub HTTP status, when GitHub answered.
+   * @param problem - known cause the panel localizes.
+   */
   constructor(
     message: string,
     readonly status?: number,
+    readonly problem?: CloudDevProblem,
   ) {
     super(message)
     this.name = 'CloudDevError'
@@ -14,6 +20,30 @@ export class CloudDevError extends Error {
 
 /** Branch prefix that marks a commit as a cloud development job. */
 export const JOB_BRANCH_PREFIX = 'dsh-cloud/'
+
+/** Repository name of the automatic private runner in the token owner's account. */
+export const AUTOMATIC_RUNNER = 'dsh-cloud-runner'
+
+/** Classic-token scopes that runner creation, workflow installation and dispatch need. */
+const REQUIRED_SCOPES = ['repo', 'workflow']
+
+/**
+ * Normalize a runner choice typed or pasted by a person.
+ * @param input - owner/name, a github.com link or an SSH remote, with or without `.git`.
+ * @returns owner/name, or an empty string for the automatic runner.
+ * @throws CloudDevError when the text names no repository.
+ */
+export function parseRepository(input: string): string {
+  const text = input.trim()
+  if (text === '') return ''
+  const link = /^(?:(?:https?:\/\/)?(?:www\.)?github\.com\/|git@github\.com:)([^?#]*)/i.exec(text)?.[1]
+  const path = link === undefined ? text : link.split('/').slice(0, 2).join('/')
+  const name = path.replace(/\/+$/, '').replace(/\.git$/i, '')
+  const match = /^([A-Za-z0-9-]+)\/([\w.-]+)$/.exec(name)
+  if (match === null || match[2] === '.' || match[2] === '..')
+    throw new CloudDevError('Enter the runner repository as owner/name or a GitHub link', undefined, 'runner-missing')
+  return `${match[1]}/${match[2]}`
+}
 
 interface WorkflowRun {
   id: number
@@ -79,7 +109,11 @@ export class GitHubClient {
       })
     } catch (error) {
       if (init.signal?.aborted === true) throw error
-      throw new CloudDevError('The cloud API could not be reached Check the network and gateway connection')
+      throw new CloudDevError(
+        'The cloud API could not be reached Check the network and gateway connection',
+        undefined,
+        'unknown',
+      )
     }
     if (response.ok) return response
     let detail = ''
@@ -89,7 +123,7 @@ export class GitHubClient {
     } catch {
       /* non-JSON error body */
     }
-    if (response.status === 401) throw new CloudDevError('GitHub rejected the token', 401)
+    if (response.status === 401) throw new CloudDevError('GitHub rejected the token', 401, 'token-invalid')
     if (response.status === 403 && /rate limit/i.test(detail))
       throw new CloudDevError('GitHub rate limit reached Try again later', 403)
     throw new CloudDevError(`GitHub ${response.status}${detail === '' ? '' : ' ' + detail}`, response.status)
@@ -99,6 +133,22 @@ export class GitHubClient {
     const response = await this.request(path, init)
     if (response.status === 204) return undefined as T
     return (await response.json()) as T
+  }
+
+  /**
+   * Verify the token and read its account.
+   * @param signal - cancellation.
+   * @returns the account login and the required scopes a classic token lacks; other token kinds report none.
+   */
+  async account(signal?: AbortSignal): Promise<{ login: string; missing: string[] }> {
+    const response = await this.request('user', { ...(signal === undefined ? {} : { signal }) })
+    const user = (await response.json()) as { login?: unknown }
+    if (typeof user.login !== 'string' || !/^[A-Za-z0-9-]+$/.test(user.login))
+      throw new CloudDevError('GitHub returned an invalid account', undefined, 'unknown')
+    const header = response.headers.get('x-oauth-scopes')
+    if (header === null || !/^gh[po]_/.test(this.token)) return { login: user.login, missing: [] }
+    const granted = header.split(',').map(scope => scope.trim())
+    return { login: user.login, missing: REQUIRED_SCOPES.filter(scope => !granted.includes(scope)) }
   }
 
   async bytes(path: string, signal?: AbortSignal): Promise<Uint8Array> {

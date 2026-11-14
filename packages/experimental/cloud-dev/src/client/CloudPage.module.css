@@ -1,28 +1,463 @@
-/* Connection and activity share the page's content axis and wrap on narrow screens. */
-.page { height: 100%; overflow-y: auto; box-sizing: border-box; padding: 28px clamp(20px, 4vw, 48px) 48px; color: var(--dsw-alias-label-primary); }
-.content { max-width: 960px; margin-inline: auto; display: flex; flex-direction: column; gap: 24px; }
-.content h1, .content h2, .content h3, .content p { margin: 0; overflow-wrap: anywhere; }
-.content h1 { font-size: 24px; font-weight: 500; }
-.content h2 { font-size: 16px; font-weight: 500; }
-.content h3 { font-size: 14px; font-weight: 500; }
-.content p { font-size: 13px; line-height: 1.6; }
-.hero { display: flex; flex-direction: column; gap: 16px; }
-.heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-.flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.flow section, .card { padding: 20px; border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-bg-module-platform); display: flex; flex-direction: column; gap: 12px; }
-.flow p, .note { color: var(--dsw-alias-label-secondary); }
-.field, .fields { display: flex; flex-direction: column; gap: 8px; }
-.fields { padding-top: 16px; gap: 16px; }
-.field > span { font-size: 13px; }
-.advanced { font-size: 13px; }
-.advanced summary { cursor: pointer; }
-.actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
-.alert { color: var(--dsw-alias-state-error-primary); padding: 12px 16px; border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-module-platform); }
-.jobs { display: flex; flex-direction: column; gap: 16px; }
-.empty { color: var(--dsw-alias-label-secondary); }
-.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
-.job { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 16px; border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-bg-module-platform); }
-.jobMain { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.job a { font-size: 13px; }
-@media (max-width: 640px) { .flow { grid-template-columns: 1fr; } }
-@media (pointer: coarse) { .field input { font-size: 16px; } }
+/* The Plugins and Tasks pages' 960px column, first-level title step and settings card material. */
+.page {
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  font-size: 14px;
+  line-height: 1.6;
+  --dsh-scrollbar-width: 9px;
+  --dsh-scrollbar-thumb-border: 2px;
+}
+
+.content {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 clamp(24px, 4vw, 48px) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (max-width: 767px) {
+  .content {
+    padding-inline: 20px;
+  }
+}
+
+.content h1,
+.content h2,
+.content h3,
+.content p,
+.content dl,
+.content dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 28px;
+}
+
+:global([data-platform='darwin']) .heading {
+  padding-top: calc(28px + var(--dsh-frame-top-clearance, 0px));
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.titleRow h1 {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 500;
+}
+
+.lead,
+.muted {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  border-radius: var(--dsw-radius-xl);
+  border: 0.5px solid var(--dsw-alias-settings-card-stroke);
+  background: var(--dsw-alias-settings-card-fill);
+}
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardHead h2,
+.jobs h2 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+/* Two numbered steps on one rail; the action of each step stays on its row until the row is too narrow. */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.stepNumber {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepText {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stepTitle {
+  font-size: 14px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+.stepField {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* An outlined Button in link form: the token page opens on GitHub. */
+.linkButton {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 14px;
+  margin-left: 36px;
+  border-radius: var(--dsw-radius-md);
+  box-shadow: inset 0 0 0 var(--dsh-hairline-width, 0.5px) var(--dsw-alias-border-l3);
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 22px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .linkButton {
+    margin-left: 0;
+  }
+}
+
+@media (hover: hover) {
+  .linkButton:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.linkButton:focus-visible,
+.row:focus-visible,
+.facts a:focus-visible {
+  outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+
+.advanced {
+  padding-left: 36px;
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.advanced summary {
+  width: fit-content;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .advanced summary:hover {
+    color: var(--dsw-alias-label-primary);
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.formFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding-top: 16px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.privacy {
+  flex: 1 1 280px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.privacy svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Connected account and runner on one line, the edit action trailing. */
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  min-width: 0;
+}
+
+.facts > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.facts dt {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.facts dd {
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.facts a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--dsw-radius-xs);
+}
+
+.facts a svg {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+@media (hover: hover) {
+  .facts a:hover {
+    text-decoration: underline;
+  }
+}
+
+.notice,
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--dsw-radius-md);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.notice {
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.error {
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.notice > span,
+.error > span {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.notice svg,
+.error svg {
+  flex: none;
+}
+
+.jobs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty {
+  padding: 32px 16px;
+  border-radius: var(--dsw-radius-xl);
+  border: 0.5px dashed var(--dsw-alias-border-l3);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 21px;
+  text-align: center;
+}
+
+/* The Tasks page's rows: 2px apart, the hover surface spanning the column with an 8px inset. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 -8px;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  a.row:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+
+  a.row:hover .rowAction {
+    color: var(--dsw-alias-label-secondary);
+  }
+}
+
+.rowGlyph {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 23px;
+}
+
+.rowContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rowTitle {
+  overflow: hidden;
+  font-weight: 500;
+  line-height: 23px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowSummary {
+  margin-top: 2px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+}
+
+.rowSummary > span + span::before {
+  content: ' · ';
+  padding: 0 2px;
+}
+
+.rowAction {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 23px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  height: 46px;
+  box-sizing: content-box;
+}
+
+.skeletonDot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-inline: 3px;
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-skeleton);
+}
+
+.skeletonText {
+  width: min(360px, 60%);
+  height: 12px;
+  border-radius: var(--dsw-radius-xs);
+  background: var(--dsw-alias-bg-skeleton);
+}
+
+@media (pointer: coarse) {
+  .card input {
+    font-size: 16px;
+  }
+}

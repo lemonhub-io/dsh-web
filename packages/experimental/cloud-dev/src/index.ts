@@ -1,13 +1,14 @@
 /**
  * Cloud development: the browser stays a stateless front end, a Cloudflare Worker is the stateless
  * gateway, and GitHub Actions compiles and runs workspace snapshots asynchronously. Job state lives
- * in GitHub (job branches, runs and artifacts); this plugin keeps only the three settings below and
- * a GitHub token in the credential store.
+ * in GitHub (job branches, runs and artifacts); this plugin keeps only the person's runner choice and
+ * a GitHub token in the credential store. The gateway URL is deployment configuration.
  * @module @deepseek-ai/dsh-experimental-cloud-dev
  */
 import { mkdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import { z } from 'zod'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import type { ToolOutputDefinition, ToolExecution, ToolResult, ToolResultView } from '@deepseek-ai/dsh-tools'
@@ -16,9 +17,12 @@ import type {} from '@deepseek-ai/dsh-working-directory'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import { CloudEngine, checkSettings } from './engine.ts'
-import { CloudDevError } from './github.ts'
+import { CloudEngine } from './engine.ts'
+import { AUTOMATIC_RUNNER, CloudDevError, GitHubClient, parseRepository } from './github.ts'
+import { RUNNER_WORKFLOW_FILE } from './runner-workflow.ts'
 import type {
+  CloudConnectRequest,
+  CloudDevProblem,
   CloudDevSettings,
   CloudDevStatus,
   CloudJob,
@@ -28,6 +32,8 @@ import type {
 } from './types.ts'
 
 export type {
+  CloudConnectRequest,
+  CloudDevProblem,
   CloudDevSettings,
   CloudDevStatus,
   CloudJob,
@@ -35,7 +41,18 @@ export type {
   CloudRunRequest,
   CloudStartedJob,
 } from './types.ts'
-export { RUNNER_WORKFLOW, RUNNER_WORKFLOW_PATH } from './runner-workflow.ts'
+export { RUNNER_WORKFLOW, RUNNER_WORKFLOW_FILE, RUNNER_WORKFLOW_PATH } from './runner-workflow.ts'
+export { parseRepository } from './github.ts'
+
+/** Deployment configuration; the person only chooses a runner repository in the panel. */
+export const Config = z
+  .object({
+    /** Base URL of the stateless gateway Worker that serves artifact and log downloads. */
+    gatewayUrl: z.url({ protocol: /^https?$/ }).default('https://dsh-gw.openhub.today'),
+  })
+  .prefault({})
+/** Validated deployment configuration after schema defaults. */
+export type Config = z.infer<typeof Config>
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -46,18 +63,31 @@ declare module '@deepseek-ai/cordis' {
 
 /** Credential reference holding the GitHub token used for the runner repository. */
 export const TOKEN_REF = 'DSH_CLOUD_GITHUB_TOKEN'
-const DEFAULT_SETTINGS: CloudDevSettings = {
-  gatewayUrl: 'https://dsh-gw.openhub.today',
-  repository: '',
-  workflow: 'dsh-cloud-run.yml',
-}
 const LOG_TAIL = 6000
+
+/** Model-visible readiness text for each problem; the panel localizes the same causes. */
+const PROBLEM_TEXT: Record<CloudDevProblem, string> = {
+  'none': 'Cloud compute is connected Use cloud_run to automatically prepare the private runner and execute the task',
+  'token-missing':
+    'Ask the user to connect GitHub once in the Cloud development panel Never ask for or accept a token in chat',
+  'token-invalid':
+    'GitHub rejected the stored token Ask the user to reconnect in the Cloud development panel Never ask for a token in chat',
+  'token-scopes':
+    'The stored GitHub token lacks the repo or workflow scope Ask the user to reconnect in the Cloud development panel',
+  'gateway': 'The cloud download gateway is unreachable Retry later',
+  'runner-missing':
+    'The chosen runner repository was not found Ask the user to fix the runner in the Cloud development panel',
+  'runner-denied':
+    'The token cannot use the chosen runner repository Ask the user to fix the runner in the Cloud development panel',
+  'unknown': 'GitHub could not be reached Retry later',
+}
 
 function failure(error: unknown): never {
   if (error instanceof RemoteError) throw error
   if (error instanceof DOMException && error.name === 'AbortError') throw error
-  const message = error instanceof CloudDevError || error instanceof Error ? error.message : 'Cloud development failed'
-  throw new RemoteError('cloudDev/failed', message, { message })
+  const message = error instanceof Error ? error.message : 'Cloud development failed'
+  const problem = error instanceof CloudDevError ? error.problem : undefined
+  throw new RemoteError('cloudDev/failed', message, { message, ...(problem === undefined ? {} : { problem }) })
 }
 
 function describeResult(result: CloudJobResult): string {
@@ -149,17 +179,26 @@ function taskResult(result: CloudJobResult): CloudToolResult {
   }
 }
 
-/** Host service: settings, readiness checks, the job lifecycle, and the agent tools. */
+/** Host service: the runner choice, readiness checks, the job lifecycle, and the agent tools. */
 export default class CloudDevService extends TypertRemoteService {
   static inject = ['typert', 'credentials', 'tools', 'workingDirectory', 'systemPrompt']
+  static Config = Config
   private readonly settingsFile = join(resolveDshHome(), 'cloud-dev', 'settings.json')
+  private readonly gateway: string
 
   private preparing: Promise<CloudPreparation> | undefined
+  /** Account of the last token GitHub accepted, so the automatic runner resolves without a request per poll. */
+  private known: { token: string; login: string } | undefined
   private readonly lifetime = new AbortController()
   private readonly operations = new Set<Promise<unknown>>()
 
-  constructor(ctx: Context) {
+  /**
+   * @param ctx - Owning plugin context.
+   * @param config - Validated deployment configuration; direct composition without one gets the schema defaults.
+   */
+  constructor(ctx: Context, config: Config = Config.parse({})) {
     super(ctx, 'cloudDev', { namespace: 'cloudDev' })
+    this.gateway = config.gatewayUrl.replace(/\/+$/, '')
     ctx.effect(
       () => async () => {
         this.lifetime.abort()
@@ -179,48 +218,77 @@ Prefer cloud_run's default waiting mode. It collects logs, exit status and artif
 
   private async readSettings(): Promise<CloudDevSettings> {
     try {
-      const stored = JSON.parse(await readFile(this.settingsFile, 'utf8')) as Partial<CloudDevSettings>
-      return {
-        gatewayUrl: typeof stored.gatewayUrl === 'string' ? stored.gatewayUrl : DEFAULT_SETTINGS.gatewayUrl,
-        repository: typeof stored.repository === 'string' ? stored.repository : DEFAULT_SETTINGS.repository,
-        workflow:
-          typeof stored.workflow === 'string' && stored.workflow !== '' ? stored.workflow : DEFAULT_SETTINGS.workflow,
-      }
+      const stored = JSON.parse(await readFile(this.settingsFile, 'utf8')) as { repository?: unknown }
+      return { repository: typeof stored.repository === 'string' ? parseRepository(stored.repository) : '' }
     } catch (error) {
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT')
-        return { ...DEFAULT_SETTINGS }
+        return { repository: '' }
       throw new CloudDevError('Cloud connection settings could not be read Reconnect through Cloud development')
     }
   }
 
-  private async engine(): Promise<CloudEngine> {
-    const settings = await this.readSettings()
+  private async writeSettings(settings: CloudDevSettings): Promise<void> {
+    await mkdir(dirname(this.settingsFile), { recursive: true })
+    await writeFileAtomic(this.settingsFile, JSON.stringify(settings, null, 2) + '\n', { mode: 0o600 })
+  }
+
+  private async storedToken(): Promise<string | undefined> {
     const token = await this.ctx.credentials.resolve(credentialRef(TOKEN_REF))
-    if (token === undefined || token.value === '')
+    return token === undefined || token.value === '' ? undefined : token.value
+  }
+
+  private async runner(settings: CloudDevSettings, token: string, signal: AbortSignal): Promise<string> {
+    if (settings.repository !== '') return settings.repository
+    if (this.known?.token !== token)
+      this.known = { token, login: (await new GitHubClient(this.gateway, token, '').account(signal)).login }
+    return `${this.known.login}/${AUTOMATIC_RUNNER}`
+  }
+
+  private async engine(signal: AbortSignal): Promise<CloudEngine> {
+    const settings = await this.readSettings()
+    const token = await this.storedToken()
+    if (token === undefined)
       throw new CloudDevError(
         'Connect GitHub once in Cloud development The AI prepares and runs compute tasks after connection',
+        undefined,
+        'token-missing',
       )
-    return new CloudEngine(settings, token.value)
+    return new CloudEngine(this.gateway, await this.runner(settings, token, signal), token)
+  }
+
+  private async prepare(settings: CloudDevSettings, token: string, signal: AbortSignal): Promise<CloudPreparation> {
+    const engine = await CloudEngine.prepare(this.gateway, settings.repository, token, signal)
+    return { engine, change: await engine.installWorkflow(signal) }
   }
 
   private async preparedEngine(signal: AbortSignal): Promise<CloudPreparation> {
     if (this.preparing !== undefined) return await this.preparing
     const preparation = (async () => {
       const settings = await this.readSettings()
-      const token = await this.ctx.credentials.resolve(credentialRef(TOKEN_REF))
-      if (token === undefined || token.value === '')
-        throw new CloudDevError('Connect GitHub once in Cloud development Do not provide the token in chat')
-      const engine = await CloudEngine.prepare(settings, token.value, signal)
-      const change = await engine.installWorkflow(signal)
-      await mkdir(dirname(this.settingsFile), { recursive: true })
-      await writeFileAtomic(this.settingsFile, JSON.stringify(engine.settings, null, 2) + '\n', { mode: 0o600 })
-      return { engine, change }
+      const token = await this.storedToken()
+      if (token === undefined)
+        throw new CloudDevError(
+          'Connect GitHub once in Cloud development Do not provide the token in chat',
+          undefined,
+          'token-missing',
+        )
+      return await this.prepare(settings, token, signal)
     })()
     this.preparing = preparation
     try {
       return await preparation
     } finally {
       this.preparing = undefined
+    }
+  }
+
+  /** Wait for an in-flight preparation so a connection change never races it. */
+  private async settled(): Promise<void> {
+    if (this.preparing === undefined) return
+    try {
+      await this.preparing
+    } catch (_preparationFailed) {
+      /* A completed failed setup does not prevent replacing its connection. */
     }
   }
 
@@ -256,9 +324,9 @@ Prefer cloud_run's default waiting mode. It collects logs, exit status and artif
   }
 
   /**
-   * Read the settings and check every link of the chain live.
+   * Check the token, gateway and runner live.
    * @param signal - query cancellation.
-   * @returns readiness of the gateway, repository and workflow.
+   * @returns the first problem blocking the next task, with the account and runner once known.
    */
   @Remote
   async status(signal: AbortSignal): Promise<CloudDevStatus> {
@@ -267,86 +335,96 @@ Prefer cloud_run's default waiting mode. It collects logs, exit status and artif
 
   private async readStatus(signal: AbortSignal): Promise<CloudDevStatus> {
     const settings = await this.readSettings()
-    const token = await this.ctx.credentials.resolve(credentialRef(TOKEN_REF))
     const status: CloudDevStatus = {
       settings,
-      tokenPresent: token !== undefined && token.value !== '',
-      gateway: 'unset',
-      repository: 'unset',
-      workflow: 'unknown',
+      problem: 'none',
+      account: null,
+      runner: settings.repository === '' ? null : settings.repository,
       defaultDirectory: this.defaultDirectory(),
       tokenRef: TOKEN_REF,
     }
-    if (settings.gatewayUrl === '') return status
+    const token = await this.storedToken()
+    if (token === undefined) return { ...status, problem: 'token-missing' }
+    let account: { login: string; missing: string[] }
     try {
-      const response = await fetch(settings.gatewayUrl.replace(/\/+$/, '') + '/health', {
+      account = await new GitHubClient(this.gateway, token, '').account(signal)
+    } catch (error) {
+      signal.throwIfAborted()
+      return { ...status, problem: error instanceof CloudDevError && error.problem === 'token-invalid' ? 'token-invalid' : 'unknown' }
+    }
+    this.known = { token, login: account.login }
+    status.account = account.login
+    status.runner = settings.repository === '' ? `${account.login}/${AUTOMATIC_RUNNER}` : settings.repository
+    if (account.missing.length > 0) return { ...status, problem: 'token-scopes' }
+    try {
+      const response = await fetch(this.gateway + '/health', {
         signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]),
       })
       const body = (await response.json()) as { service?: string }
-      status.gateway = body.service === 'dsh-cloud-gateway' ? 'ok' : 'unreachable'
+      if (body.service !== 'dsh-cloud-gateway') return { ...status, problem: 'gateway' }
     } catch (_unreachableGateway) {
       signal.throwIfAborted()
-      status.gateway = 'unreachable'
+      return { ...status, problem: 'gateway' }
     }
-    if (status.gateway !== 'ok' || settings.repository === '' || !status.tokenPresent || token === undefined)
-      return status
     try {
-      const engine = new CloudEngine(settings, token.value)
-      if (settings.repository === '') {
-        await engine.github.json('user', { signal })
-        return status
-      }
+      const engine = new CloudEngine(this.gateway, status.runner, token)
       await engine.github.json(engine.github.repo(), { signal })
-      status.repository = 'ok'
-      status.workflow = (await engine.workflowInstalled(signal)) ? 'installed' : 'missing'
     } catch (error) {
       signal.throwIfAborted()
       const code = error instanceof CloudDevError ? error.status : undefined
-      status.repository = code === 404 ? 'missing' : code === 401 || code === 403 ? 'unauthorized' : 'unknown'
+      // The automatic runner is created by the next connection or task.
+      if (code === 404 && settings.repository === '') return status
+      return {
+        ...status,
+        problem: code === 404 ? 'runner-missing' : code === 401 || code === 403 ? 'runner-denied' : 'unknown',
+      }
     }
     return status
   }
 
   /**
-   * Save the gateway URL, runner repository and workflow name.
-   * @param settings - new settings; validated before they are stored.
+   * Verify a token and runner choice, prepare the runner and its workflow, then store both.
+   * Nothing is stored when any step fails, so a mistyped token never replaces a working one.
+   * @param request - optional new token and the runner choice.
    * @param signal - cancellation.
+   * @returns readiness after the connection.
    */
   @Remote
-  async configure(settings: CloudDevSettings, signal: AbortSignal): Promise<void> {
-    return this.operation(signal, async (active) => {
-      if (this.preparing !== undefined) {
-        try {
-          await this.preparing
-        } catch (_preparationFailed) {
-          /* A completed failed setup does not prevent replacing its connection settings. */
-        }
-      }
-      active.throwIfAborted()
-      const next = {
-        gatewayUrl: settings.gatewayUrl.trim().replace(/\/+$/, ''),
-        repository: settings.repository.trim(),
-        workflow: settings.workflow.trim() || DEFAULT_SETTINGS.workflow,
-      }
-      try {
-        checkSettings(next)
-      } catch (error) {
-        failure(error)
-      }
-      await mkdir(dirname(this.settingsFile), { recursive: true })
-      await writeFileAtomic(this.settingsFile, JSON.stringify(next, null, 2) + '\n', { mode: 0o600 })
-    })
+  async connect(request: CloudConnectRequest, signal: AbortSignal): Promise<CloudDevStatus> {
+    try {
+      return await this.operation(signal, async (active) => {
+        await this.settled()
+        active.throwIfAborted()
+        const settings: CloudDevSettings = { repository: parseRepository(request.repository) }
+        const supplied = request.token?.trim() ?? ''
+        if (/\s/.test(supplied))
+          throw new CloudDevError('The GitHub token cannot contain spaces', undefined, 'token-invalid')
+        const token = supplied === '' ? await this.storedToken() : supplied
+        if (token === undefined) throw new CloudDevError('Paste a GitHub token first', undefined, 'token-missing')
+        await this.prepare(settings, token, active)
+        if (supplied !== '') await this.ctx.credentials.set(credentialRef(TOKEN_REF), supplied)
+        await this.writeSettings(settings)
+        return await this.readStatus(active)
+      })
+    } catch (error) {
+      failure(error)
+    }
   }
 
   /**
-   * Install or update the runner workflow in the runner repository.
+   * Remove the stored GitHub token; the runner choice and remote jobs remain.
    * @param signal - cancellation.
-   * @returns what changed.
+   * @returns readiness after the token is removed.
    */
   @Remote
-  async setup(signal: AbortSignal): Promise<'created' | 'updated' | 'unchanged'> {
+  async disconnect(signal: AbortSignal): Promise<CloudDevStatus> {
     try {
-      return (await this.operation(signal, active => this.preparedEngine(active))).change
+      return await this.operation(signal, async (active) => {
+        await this.settled()
+        await this.ctx.credentials.unset(credentialRef(TOKEN_REF))
+        this.known = undefined
+        return await this.readStatus(active)
+      })
     } catch (error) {
       failure(error)
     }
@@ -381,8 +459,14 @@ Prefer cloud_run's default waiting mode. It collects logs, exit status and artif
   async jobs(signal: AbortSignal): Promise<CloudJob[]> {
     try {
       return await this.operation(signal, async (active) => {
-        const engine = await this.engine()
-        return await engine.github.jobs(engine.settings.workflow, active)
+        const engine = await this.engine(active)
+        try {
+          return await engine.github.jobs(RUNNER_WORKFLOW_FILE, active)
+        } catch (error) {
+          // A runner without its workflow yet has no history.
+          if (error instanceof CloudDevError && error.status === 404) return []
+          throw error
+        }
       })
     } catch (error) {
       failure(error)
@@ -398,7 +482,7 @@ Prefer cloud_run's default waiting mode. It collects logs, exit status and artif
   @Remote
   async cancel(id: string, signal: AbortSignal): Promise<CloudJob> {
     try {
-      return await this.operation(signal, async active => (await this.engine()).cancel(id, active))
+      return await this.operation(signal, async active => (await this.engine(active)).cancel(id, active))
     } catch (error) {
       failure(error)
     }
@@ -415,7 +499,7 @@ Prefer cloud_run's default waiting mode. It collects logs, exit status and artif
   async collect(id: string, directory: string | undefined, signal: AbortSignal): Promise<CloudJobResult> {
     try {
       return await this.operation(signal, async active =>
-        (await this.engine()).collect(id, directory ?? this.defaultDirectory(), active),
+        (await this.engine(active)).collect(id, directory ?? this.defaultDirectory(), active),
       )
     } catch (error) {
       failure(error)
@@ -438,17 +522,8 @@ Prefer cloud_run's default waiting mode. It collects logs, exit status and artif
           output: TEXT_OUTPUT,
           execute: async (_args: object, exec: ToolExec): Promise<CloudToolResult> =>
             this.operation(exec.signal, async (signal) => {
-              const status = await this.readStatus(signal)
-              const ready =
-                status.tokenPresent &&
-                status.gateway === 'ok' &&
-                (status.settings.repository === '' ? status.repository === 'unset' : status.repository === 'ok')
-              return {
-                status: ready ? 'ready' : 'needs-connection',
-                text: ready
-                  ? 'Cloud compute is connected Use cloud_run to automatically prepare the private runner and execute the task'
-                  : 'Connect GitHub in the Cloud development panel or check its gateway connection Never provide a token in chat',
-              }
+              const { problem } = await this.readStatus(signal)
+              return { status: problem === 'none' ? 'ready' : 'needs-connection', text: PROBLEM_TEXT[problem] }
             }),
         }),
       'cloud-dev: cloud_status tool',
@@ -582,7 +657,7 @@ Prefer cloud_run's default waiting mode. It collects logs, exit status and artif
           execute: async (args: JobArgs, exec: ToolExec): Promise<CloudToolResult> =>
             this.operation(exec.signal, async (signal) => {
               const caller = await scope({ ...exec, signal })
-              const engine = await this.engine()
+              const engine = await this.engine(signal)
               const origin = await engine.origin(args.id, caller.owner, caller.directory, signal)
               if (args.action === 'cancel') {
                 const job = await engine.cancel(args.id, signal)

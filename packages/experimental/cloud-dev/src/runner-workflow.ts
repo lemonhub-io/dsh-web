@@ -1,7 +1,10 @@
 /** The GitHub Actions workflow that runs cloud development jobs in the runner repository. */
 
-/** Default path of the runner workflow inside the runner repository. */
-export const RUNNER_WORKFLOW_PATH = '.github/workflows/dsh-cloud-run.yml'
+/** File name of the runner workflow the plugin installs and dispatches. */
+export const RUNNER_WORKFLOW_FILE = 'dsh-cloud-run.yml'
+
+/** Path of the runner workflow inside the runner repository. */
+export const RUNNER_WORKFLOW_PATH = `.github/workflows/${RUNNER_WORKFLOW_FILE}`
 
 /** Artifact name holding the log, exit status and returned files of one job. */
 export const RESULT_ARTIFACT = 'dsh-cloud-result'

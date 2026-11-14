@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.2-rc.1/cloud-compute/guide.md
 /:
-  en: e97fed9d7ee3a36e
-  zh: 1ed473972678fcc3
+  en: b7dc1dc0e969a9c8
+  zh: 143682981213d766
 /ai-controlled-cloud-computing:
   en: 68a3a28f3e1fa529
   zh: 958a897855a0443e
 /ai-controlled-cloud-computing/change:
-  en: aa52cc6c28134e3a
-  zh: 9013b92bb7721b8a
+  en: 2f4728e1b204ba64
+  zh: f9657c369bc27968
 /ai-controlled-cloud-computing/migration:
-  en: e2d630e394270867
-  zh: 36333ae979902e32
+  en: 26e68f0dd90fed6e
+  zh: 746784c8b998adb1

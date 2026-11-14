@@ -1,229 +1,459 @@
 /** One-time cloud connection and observation of AI-controlled computing tasks. */
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Button, Input, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  Button,
+  IconRightUpOutlineRegular,
+  IconShieldOutlineRegular,
+  IconWarningOutlineRegular,
+  Input,
+  StateDot,
+  Tag,
+  relativeTime,
+  type StateDotState,
+  type TagTone,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { CloudDevSettings, CloudDevStatus, CloudJob } from '../types.ts'
+import type { CloudConnectRequest, CloudDevProblem, CloudDevStatus, CloudJob } from '../types.ts'
+import type { CloudDevKey } from './locales.ts'
 import css from './CloudPage.module.css'
+
+/** A failed panel operation; a known `problem` selects localized copy, otherwise the message is shown. */
+export class CloudPanelError extends Error {
+  /**
+   * @param message - host diagnostic shown when no localized cause applies.
+   * @param problem - known cause reported by the host.
+   */
+  constructor(message: string, readonly problem?: CloudDevProblem) {
+    super(message)
+    this.name = 'CloudPanelError'
+  }
+}
 
 /** Account connection and read-only job observation The Agent owns task execution. */
 export interface CloudDevFace {
   status(): Promise<CloudDevStatus>
-  configure(settings: CloudDevSettings): Promise<void>
-  saveToken(token: string): Promise<void>
-  setup(): Promise<'created' | 'updated' | 'unchanged'>
+  connect(request: CloudConnectRequest): Promise<CloudDevStatus>
+  disconnect(): Promise<CloudDevStatus>
   jobs(): Promise<CloudJob[]>
 }
 /** Framework-supplied locale and connection callbacks. */
 export type CloudPageProps = PropsRuntime<'main'> & PropsLocale<'cloudDev'> & InjectFace<CloudDevFace>
 
-/** Render connection settings and the AI's cloud task history.
+/** Classic token creation with the two scopes the runner needs already selected. */
+const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=repo,workflow&description=DSH%20cloud%20compute'
+const ACTIVE_POLL_MS = 5000
+const IDLE_POLL_MS = 30000
+
+const PROBLEM_KEY: Record<Exclude<CloudDevProblem, 'none'>, CloudDevKey> = {
+  'token-missing': 'problemTokenMissing',
+  'token-invalid': 'problemTokenInvalid',
+  'token-scopes': 'problemTokenScopes',
+  'gateway': 'problemGateway',
+  'runner-missing': 'problemRunnerMissing',
+  'runner-denied': 'problemRunnerDenied',
+  'unknown': 'problemUnknown',
+}
+
+function stateTone(problem: CloudDevProblem): TagTone {
+  if (problem === 'none') return 'success'
+  return problem === 'token-missing' ? 'neutral' : 'warning'
+}
+
+function jobDot(job: CloudJob): StateDotState {
+  if (job.status !== 'completed') return 'ongoing'
+  if (job.conclusion === 'success') return 'done'
+  return job.conclusion === 'cancelled' ? 'idle' : 'error'
+}
+
+/** Render the connection and the AI's cloud task history.
  * @param props Locale and account connection operations.
  * @returns A monitor without manual command submission or artifact collection controls.
  */
 export function CloudPage(props: CloudPageProps): ReactNode {
   const { t } = props
   const [status, setStatus] = useState<CloudDevStatus>()
-  const [settings, setSettings] = useState<CloudDevSettings>({
-    gatewayUrl: '',
-    repository: '',
-    workflow: 'dsh-cloud-run.yml',
-  })
+  const [editing, setEditing] = useState(false)
   const [token, setToken] = useState('')
-  const [jobs, setJobs] = useState<CloudJob[]>([])
-  const [busy, setBusy] = useState(false)
+  const [repository, setRepository] = useState('')
+  const [busy, setBusy] = useState<'connect' | 'disconnect'>()
+  const [checking, setChecking] = useState(false)
   const [problem, setProblem] = useState<string>()
-  const alive = useRef(false)
-  const generation = useRef(0)
-  const connected =
-    status?.tokenPresent === true &&
-    status.gateway === 'ok' &&
-    (status.settings.repository === '' ? status.repository === 'unset' : status.repository === 'ok')
+  const [jobs, setJobs] = useState<CloudJob[]>()
+  const [jobsFailed, setJobsFailed] = useState(false)
+  const alive = useRef(true)
+  const editingRef = useRef(false)
+  editingRef.current = editing
 
-  const refresh = async (first = false, signal?: AbortSignal): Promise<void> => {
-    const request = ++generation.current
-    const current = await props.status()
-    const list = current.repository === 'ok' && current.workflow === 'installed' ? await props.jobs() : []
-    if (!alive.current || signal?.aborted === true || request !== generation.current) return
-    setStatus(current)
-    setJobs(list)
-    if (first) setSettings(current.settings)
-    setProblem(undefined)
+  const describe = (error: unknown, fallback: CloudDevKey): string => {
+    if (error instanceof CloudPanelError && error.problem !== undefined && error.problem !== 'none')
+      return t(PROBLEM_KEY[error.problem])
+    return error instanceof Error && error.message !== '' ? error.message : t(fallback)
+  }
+  const accept = (next: CloudDevStatus): void => {
+    setStatus(next)
+    // A background refresh never replaces what the person is typing.
+    if (!editingRef.current) setRepository(next.settings.repository)
+  }
+  const readStatus = async (): Promise<void> => {
+    setChecking(true)
+    try {
+      const next = await props.status()
+      if (alive.current) accept(next)
+    } catch (error) {
+      if (alive.current) setProblem(describe(error, 'failedStatus'))
+    } finally {
+      if (alive.current) setChecking(false)
+    }
   }
   useEffect(() => {
     alive.current = true
-    const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const poll = async (first: boolean): Promise<void> => {
-      try {
-        await refresh(first, controller.signal)
-      } catch (error) {
-        if (alive.current) setProblem(error instanceof Error ? error.message : t('failedRefresh'))
-      } finally {
-        if (!controller.signal.aborted)
-          timer = setTimeout(() => {
-            void poll(false)
-          }, 5000)
-      }
-    }
-    void poll(true)
+    void readStatus()
     return () => {
       alive.current = false
-      controller.abort()
-      clearTimeout(timer)
     }
   }, [])
 
-  const jobState = (job: CloudJob): string =>
-    job.status !== 'completed'
-      ? t(job.status === 'in_progress' ? 'running' : 'queued')
-      : t(job.conclusion === 'success' ? 'success' : job.conclusion === 'cancelled' ? 'cancelled' : 'failed')
+  const ready = status?.problem === 'none'
+  const runner = status?.runner ?? null
+  useEffect(() => {
+    if (!ready) {
+      setJobs(undefined)
+      return
+    }
+    let stopped = false
+    let running = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const tick = async (): Promise<void> => {
+      clearTimeout(timer)
+      if (running || stopped) return
+      running = true
+      let active = false
+      try {
+        if (document.visibilityState !== 'hidden') {
+          const list = await props.jobs()
+          active = list.some(job => job.status !== 'completed')
+          if (!stopped) {
+            setJobs(list)
+            setJobsFailed(false)
+          }
+        }
+      } catch (_readFailed) {
+        // The notice stays beside the last list; the next poll retries and the status shows a lasting cause.
+        if (!stopped) {
+          setJobsFailed(true)
+          setJobs(previous => previous ?? [])
+          void readStatus()
+        }
+      } finally {
+        running = false
+      }
+      if (!stopped) timer = setTimeout(() => void tick(), active ? ACTIVE_POLL_MS : IDLE_POLL_MS)
+    }
+    const visible = (): void => {
+      if (document.visibilityState === 'visible') void tick()
+    }
+    void tick()
+    document.addEventListener('visibilitychange', visible)
+    return () => {
+      stopped = true
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', visible)
+    }
+  }, [ready, runner])
 
-  return (
-    <div className={css.page}>
-      <div className={css.content}>
-        <header className={css.hero}>
-          <div className={css.heading}>
-            <h1>{t('title')}</h1>
-            <Tag>{t(status === undefined ? 'loading' : connected ? 'stateOk' : 'stateUnset')}</Tag>
+  const submit = (event: FormEvent): void => {
+    event.preventDefault()
+    if (busy !== undefined) return
+    setBusy('connect')
+    setProblem(undefined)
+    props
+      .connect({ token: token.trim(), repository: repository.trim() })
+      .then((next) => {
+        if (!alive.current) return
+        editingRef.current = false
+        setEditing(false)
+        setToken('')
+        accept(next)
+      })
+      .catch((error: unknown) => {
+        if (alive.current) setProblem(describe(error, 'failedConnect'))
+      })
+      .finally(() => {
+        if (alive.current) setBusy(undefined)
+      })
+  }
+  const disconnect = (): void => {
+    if (busy !== undefined) return
+    setBusy('disconnect')
+    setProblem(undefined)
+    props
+      .disconnect()
+      .then((next) => {
+        if (!alive.current) return
+        editingRef.current = false
+        setEditing(false)
+        setToken('')
+        accept(next)
+      })
+      .catch((error: unknown) => {
+        if (alive.current) setProblem(describe(error, 'failedConnect'))
+      })
+      .finally(() => {
+        if (alive.current) setBusy(undefined)
+      })
+  }
+
+  const tokenStored = status !== undefined && status.problem !== 'token-missing'
+  const showForm = status !== undefined && (status.problem === 'token-missing' || editing)
+  const now = Date.now()
+
+  const timeLabel = (iso: string): string => {
+    const { unit, n } = relativeTime(Date.parse(iso), now)
+    if (unit === 'now') return t('timeNow')
+    const key: Record<typeof unit, CloudDevKey> = {
+      minutes: 'timeMinutes',
+      hours: 'timeHours',
+      days: 'timeDays',
+      months: 'timeMonths',
+      years: 'timeYears',
+    }
+    return t(key[unit], { n })
+  }
+  const jobLabel = (job: CloudJob): string => {
+    if (job.status !== 'completed') return t(job.status === 'in_progress' ? 'running' : 'queued')
+    if (job.conclusion === 'success') return t('success')
+    return t(job.conclusion === 'cancelled' ? 'cancelled' : 'failed')
+  }
+
+  const connectForm = (
+    <form className={css.card} onSubmit={submit} aria-labelledby="cloud-connect">
+      <div className={css.cardHead}>
+        <h2 id="cloud-connect">{t(editing ? 'editTitle' : 'connectTitle')}</h2>
+        <p className={css.muted}>{t('connectLead')}</p>
+      </div>
+      <ol className={css.steps}>
+        <li className={css.step}>
+          <span className={css.stepNumber} aria-hidden="true">1</span>
+          <div className={css.stepText}>
+            <span className={css.stepTitle}>{t('stepCreate')}</span>
+            <p className={css.muted}>{t('stepCreateHint')}</p>
           </div>
-          <p>{t('intro')}</p>
-          <div className={css.flow}>
-            <section>
-              <h2>{t('planTitle')}</h2>
-              <p>{t('planText')}</p>
-            </section>
-            <section>
-              <h2>{t('computeTitle')}</h2>
-              <p>{t('computeText')}</p>
-            </section>
-            <section>
-              <h2>{t('returnTitle')}</h2>
-              <p>{t('returnText')}</p>
-            </section>
-          </div>
-        </header>
-        <p className={css.note}>{t('automatic')}</p>
-        {problem !== undefined && (
-          <p className={css.alert} role="alert">
-            {problem}
-          </p>
-        )}
-        <form
-          className={css.card}
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (busy) return
-            setBusy(true)
-            setProblem(undefined)
-            void (async () => {
-              await props.configure(settings)
-              if (token.trim() !== '') await props.saveToken(token.trim())
-              await props.setup()
-              if (!alive.current) return
-              setToken('')
-              await refresh(true)
-            })()
-              .catch((error: unknown) => {
-                if (alive.current) setProblem(error instanceof Error ? error.message : t('failedConnect'))
-              })
-              .finally(() => {
-                if (alive.current) setBusy(false)
-              })
-          }}
-        >
-          <h2>{t('settingsTitle')}</h2>
-          <p className={css.note}>{t('connectionHelp')}</p>
-          <label className={css.field}>
-            <span>{t('token')}</span>
+          <a className={css.linkButton} href={TOKEN_URL} target="_blank" rel="noreferrer">
+            {t('createToken')}
+            <IconRightUpOutlineRegular size={14} />
+          </a>
+        </li>
+        <li className={css.step}>
+          <span className={css.stepNumber} aria-hidden="true">2</span>
+          <label className={css.stepField}>
+            <span className={css.stepTitle}>{t('stepPaste')}</span>
             <Input
               type="password"
               value={token}
               autoComplete="off"
-              placeholder={status?.tokenPresent === true ? t('tokenSaved') : t('tokenHint')}
+              spellCheck={false}
+              placeholder={tokenStored ? t('tokenKept') : t('tokenPlaceholder')}
               onChange={(event) => {
                 setToken(event.target.value)
               }}
             />
           </label>
-          <details className={css.advanced}>
-            <summary>{t('advanced')}</summary>
-            <div className={css.fields}>
-              <label className={css.field}>
-                <span>{t('repository')}</span>
-                <Input
-                  value={settings.repository}
-                  placeholder={t('repositoryHint')}
-                  onChange={(event) => {
-                    setSettings({ ...settings, repository: event.target.value })
-                  }}
-                />
-              </label>
-              <label className={css.field}>
-                <span>{t('gatewayUrl')}</span>
-                <Input
-                  value={settings.gatewayUrl}
-                  onChange={(event) => {
-                    setSettings({ ...settings, gatewayUrl: event.target.value })
-                  }}
-                />
-              </label>
-              <label className={css.field}>
-                <span>{t('workflow')}</span>
-                <Input
-                  value={settings.workflow}
-                  onChange={(event) => {
-                    setSettings({ ...settings, workflow: event.target.value })
-                  }}
-                />
-              </label>
-            </div>
-          </details>
-          <div className={css.actions}>
-            <Button
-              type="submit"
-              disabled={busy || status === undefined || (token.trim() === '' && !status.tokenPresent)}
-            >
-              {t(busy ? 'connecting' : connected ? 'save' : 'connect')}
+        </li>
+      </ol>
+      <details className={css.advanced} open={status?.settings.repository !== ''}>
+        <summary>{t('existingRepo')}</summary>
+        <label className={css.field}>
+          <span className={css.srOnly}>{t('runner')}</span>
+          <Input
+            value={repository}
+            spellCheck={false}
+            placeholder={t('repositoryPlaceholder')}
+            onChange={(event) => {
+              setRepository(event.target.value)
+            }}
+          />
+          <span className={css.muted}>{t('repositoryHint')}</span>
+        </label>
+      </details>
+      {problem !== undefined && (
+        <p className={css.error} role="alert">
+          <IconWarningOutlineRegular size={16} />
+          <span>{problem}</span>
+        </p>
+      )}
+      <div className={css.formFooter}>
+        <p className={css.privacy}>
+          <IconShieldOutlineRegular size={14} />
+          <span>{t('privacy')}</span>
+        </p>
+        <div className={css.actions}>
+          {editing && tokenStored && (
+            <Button variant="ghost" disabled={busy !== undefined} onClick={disconnect}>
+              {t(busy === 'disconnect' ? 'disconnecting' : 'disconnect')}
             </Button>
-          </div>
-        </form>
-        <section className={css.jobs} aria-labelledby="cloud-jobs">
-          <div className={css.heading}>
-            <h2 id="cloud-jobs">{t('jobsTitle')}</h2>
+          )}
+          {editing && (
             <Button
-              variant="ghost"
-              size="sm"
-              disabled={busy}
+              variant="outline"
+              disabled={busy !== undefined}
               onClick={() => {
-                void refresh().catch((error: unknown) => {
-                  if (alive.current) setProblem(error instanceof Error ? error.message : t('failedRefresh'))
-                })
+                setEditing(false)
+                setToken('')
+                setProblem(undefined)
+                setRepository(status?.settings.repository ?? '')
               }}
             >
-              {t('refresh')}
+              {t('cancel')}
             </Button>
-          </div>
-          {jobs.length === 0 ? (
-            <p className={css.empty}>{t('noJobs')}</p>
-          ) : (
-            <ul className={css.list}>
-              {jobs.map(job => (
-                <li key={job.id} className={css.job}>
-                  <div className={css.jobMain}>
-                    <h3>{job.command}</h3>
-                    <p className={css.note}>{job.id}</p>
-                  </div>
-                  <Tag>{jobState(job)}</Tag>
-                  {job.url !== null && (
-                    <a href={job.url} target="_blank" rel="noreferrer">
-                      {t('openRun')}
-                    </a>
-                  )}
-                </li>
-              ))}
-            </ul>
           )}
-        </section>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={busy !== undefined || (token.trim() === '' && !tokenStored)}
+          >
+            {t(busy === 'connect' ? 'connecting' : editing ? 'save' : 'connect')}
+          </Button>
+        </div>
+      </div>
+    </form>
+  )
+
+  const connection = status !== undefined && (
+    <section className={css.card} aria-label={t('connectionLabel')}>
+      <div className={css.summary}>
+        <dl className={css.facts}>
+          {status.account !== null && (
+            <div>
+              <dt>{t('account')}</dt>
+              <dd>{status.account}</dd>
+            </div>
+          )}
+          {status.runner !== null && (
+            <div>
+              <dt>{t('runner')}</dt>
+              <dd>
+                <a href={`https://github.com/${status.runner}`} target="_blank" rel="noreferrer">
+                  {status.runner}
+                  <IconRightUpOutlineRegular size={14} />
+                </a>
+              </dd>
+            </div>
+          )}
+        </dl>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setProblem(undefined)
+            setEditing(true)
+          }}
+        >
+          {t('edit')}
+        </Button>
+      </div>
+      {status.problem !== 'none' && status.problem !== 'token-missing' && (
+        <div className={css.notice} role="status">
+          <IconWarningOutlineRegular size={16} />
+          <span>{t(PROBLEM_KEY[status.problem])}</span>
+          {(status.problem === 'gateway' || status.problem === 'unknown') && (
+            <Button variant="ghost" size="sm" disabled={checking} onClick={() => void readStatus()}>
+              {t('retry')}
+            </Button>
+          )}
+        </div>
+      )}
+      {problem !== undefined && (
+        <p className={css.error} role="alert">
+          <IconWarningOutlineRegular size={16} />
+          <span>{problem}</span>
+        </p>
+      )}
+    </section>
+  )
+
+  return (
+    <div className={css.page}>
+      <div className={css.content}>
+        <header className={css.heading}>
+          <div className={css.titleRow}>
+            <h1>{t('title')}</h1>
+            {status !== undefined && (
+              <Tag tone={stateTone(status.problem)}>
+                {t(status.problem === 'none' ? 'stateReady' : status.problem === 'token-missing' ? 'stateNeeded' : 'stateProblem')}
+              </Tag>
+            )}
+          </div>
+          <p className={css.lead}>{t('intro')}</p>
+        </header>
+        {status === undefined ? (
+          problem === undefined ? (
+            <div className={css.loading}>
+              <StateDot state="ongoing" size={20} />
+            </div>
+          ) : (
+            <div className={css.notice} role="alert">
+              <IconWarningOutlineRegular size={16} />
+              <span>{problem}</span>
+              <Button variant="ghost" size="sm" disabled={checking} onClick={() => void readStatus()}>
+                {t('retry')}
+              </Button>
+            </div>
+          )
+        ) : showForm ? connectForm : connection}
+        {ready && (
+          <section className={css.jobs} aria-labelledby="cloud-jobs">
+            <h2 id="cloud-jobs">{t('jobsTitle')}</h2>
+            {jobsFailed && <p className={css.muted}>{t('failedJobs')}</p>}
+            {jobs === undefined ? (
+              <ul className={css.list} aria-busy="true">
+                {[0, 1, 2].map(row => (
+                  <li key={row} className={css.skeletonRow}>
+                    <span className={css.skeletonDot} />
+                    <span className={css.skeletonText} />
+                  </li>
+                ))}
+              </ul>
+            ) : jobs.length === 0 ? (
+              <p className={css.empty}>{t('noJobs')}</p>
+            ) : (
+              <ul className={css.list}>
+                {jobs.map((job) => {
+                  const body = (
+                    <>
+                      <span className={css.rowGlyph}>
+                        <StateDot state={jobDot(job)} />
+                      </span>
+                      <span className={css.rowContent}>
+                        <span className={css.rowTitle}>{job.command === '' ? job.id : job.command}</span>
+                        <span className={css.rowSummary}>
+                          <span>{jobLabel(job)}</span>
+                          <span>{timeLabel(job.createdAt)}</span>
+                          <span>{job.id}</span>
+                        </span>
+                      </span>
+                      {job.url !== null && (
+                        <span className={css.rowAction} aria-hidden="true">
+                          <IconRightUpOutlineRegular size={14} />
+                        </span>
+                      )}
+                    </>
+                  )
+                  return (
+                    <li key={job.id}>
+                      {job.url === null ? (
+                        <div className={css.row}>{body}</div>
+                      ) : (
+                        <a className={css.row} href={job.url} target="_blank" rel="noreferrer" title={t('openRun')}>
+                          {body}
+                        </a>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+        )}
       </div>
     </div>
   )

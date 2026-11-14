@@ -1,28 +1,50 @@
 /** Browser-safe shapes shared by the cloud development host service and its panel. */
 import type {} from '@deepseek-ai/dsh-typert-protocol'
 
-/** Where jobs go: the gateway in front of GitHub and the repository whose Actions run them. */
+/** The person's only connection choice; the gateway and workflow belong to the deployment. */
 export interface CloudDevSettings {
-  /** Base URL of the stateless gateway Worker, without a trailing slash. */
-  gatewayUrl: string
-  /** Runner repository as owner/name. */
+  /** Runner repository as owner/name; empty selects the token owner's private `dsh-cloud-runner`. */
   repository: string
-  /** Workflow file name inside .github/workflows. */
-  workflow: string
 }
 
-/** Readiness of each link in the chain, checked live without storing anything. */
+/** What blocks the next cloud task, or `none` when the AI can run one. */
+export type CloudDevProblem =
+  /** No GitHub token is stored. */
+  | 'token-missing'
+  /** GitHub rejected the stored token. */
+  | 'token-invalid'
+  /** A classic token lacks the `repo` or `workflow` scope. */
+  | 'token-scopes'
+  /** The download gateway did not answer its health check. */
+  | 'gateway'
+  /** The chosen runner repository does not exist for this token. */
+  | 'runner-missing'
+  /** The token cannot read the chosen runner repository or write its workflow. */
+  | 'runner-denied'
+  /** GitHub could not be reached or answered unexpectedly. */
+  | 'unknown'
+  | 'none'
+
+/** Readiness checked live; nothing here is stored. */
 export interface CloudDevStatus {
   settings: CloudDevSettings
-  /** Whether a GitHub token is stored in the credential store. */
-  tokenPresent: boolean
-  gateway: 'unset' | 'ok' | 'unreachable'
-  repository: 'unset' | 'ok' | 'missing' | 'unauthorized' | 'unknown'
-  workflow: 'unknown' | 'installed' | 'missing'
+  problem: CloudDevProblem
+  /** GitHub account that owns the token, once GitHub accepted it. */
+  account: string | null
+  /** Runner repository tasks use, as owner/name, once known. */
+  runner: string | null
   /** Default directory for authenticated Remote requests AI tools use the Session directory. */
   defaultDirectory: string
   /** Credential reference holding the GitHub token. */
   tokenRef: string
+}
+
+/** The panel's one-step connection. Nothing is stored unless GitHub accepts the token and the runner is ready. */
+export interface CloudConnectRequest {
+  /** New GitHub token; omitted or blank keeps the stored token. */
+  token?: string
+  /** Runner choice as owner/name or a GitHub repository link; empty selects the automatic private runner. */
+  repository: string
 }
 
 /** One job as GitHub reports it; the branch dsh-cloud/<id> identifies it. */
@@ -90,7 +112,7 @@ export interface CloudStartedJob {
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
-    /** A link in the chain refused or failed; the message is safe to show. */
-    'cloudDev/failed': { message: string }
+    /** A link in the chain refused or failed; the message is safe to show and `problem` names a known cause. */
+    'cloudDev/failed': { message: string; problem?: CloudDevProblem }
   }
 }

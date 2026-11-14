@@ -2,11 +2,10 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join } from 'node:path'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
-import { CloudDevError, GitHubClient, JOB_BRANCH_PREFIX } from './github.ts'
-import { RESULT_ARTIFACT, RUNNER_WORKFLOW } from './runner-workflow.ts'
+import { AUTOMATIC_RUNNER, CloudDevError, GitHubClient, JOB_BRANCH_PREFIX } from './github.ts'
+import { RESULT_ARTIFACT, RUNNER_WORKFLOW, RUNNER_WORKFLOW_FILE, RUNNER_WORKFLOW_PATH } from './runner-workflow.ts'
 import { snapshot, type SnapshotFile } from './snapshot.ts'
 import type {
-  CloudDevSettings,
   CloudJob,
   CloudJobResult,
   CloudRunRequest,
@@ -45,52 +44,56 @@ export function newJobId(): string {
   return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6)
 }
 
-/** Validate settings before any request leaves the browser. */
-export function checkSettings(settings: CloudDevSettings): void {
-  if (!/^https?:\/\/[^/\s]+(?:\/[^\s]*)?$/.test(settings.gatewayUrl))
-    throw new CloudDevError('Set the gateway URL first')
-  if (settings.repository !== '' && !/^[\w.-]+\/[\w.-]+$/.test(settings.repository))
-    throw new CloudDevError('Set the runner repository as owner/name or leave it empty for automatic setup')
-  if (!/^[\w.-]+\.ya?ml$/.test(settings.workflow)) throw new CloudDevError('The workflow must be a yml file name')
-}
-
-/** Lifecycle operations for one configured runner repository. */
+/** Lifecycle operations for one resolved runner repository. */
 export class CloudEngine {
   readonly github: GitHubClient
 
+  /**
+   * @param gateway - deployment gateway base URL without a trailing slash.
+   * @param repository - resolved runner repository as owner/name.
+   * @param token - GitHub credential kept outside model-visible values.
+   */
   constructor(
-    readonly settings: CloudDevSettings,
+    gateway: string,
+    readonly repository: string,
     token: string,
   ) {
-    checkSettings(settings)
-    this.github = new GitHubClient(settings.gatewayUrl.replace(/\/+$/, ''), token, settings.repository)
+    this.github = new GitHubClient(gateway, token, repository)
   }
 
-  /** Resolve a private runner automatically or check an explicitly selected repository.
-   * @param settings Saved connection settings An empty repository selects an account-owned private runner.
+  /** Verify the token, then resolve and check the runner; the automatic runner is created when missing.
+   * @param gateway Deployment gateway base URL.
+   * @param choice The person's runner choice An empty choice selects the account-owned private runner.
    * @param token GitHub credential kept outside model-visible values.
    * @param signal Cancellation.
-   * @returns Engine with its resolved repository The service installs the workflow before admitting tasks.
+   * @returns Engine for the resolved runner The caller installs the workflow before admitting tasks.
    */
-  static async prepare(settings: CloudDevSettings, token: string, signal: AbortSignal): Promise<CloudEngine> {
-    checkSettings(settings)
-    let engine = new CloudEngine(settings, token)
-    const automatic = settings.repository === ''
-    if (automatic) {
-      const user = await engine.github.json<{ login: string }>('user', { signal })
-      if (!/^[\w-]+$/.test(user.login)) throw new CloudDevError('GitHub returned an invalid account')
-      engine = new CloudEngine({ ...settings, repository: `${user.login}/dsh-cloud-runner` }, token)
-    }
+  static async prepare(gateway: string, choice: string, token: string, signal: AbortSignal): Promise<CloudEngine> {
+    const account = await new GitHubClient(gateway, token, '').account(signal)
+    if (account.missing.length > 0)
+      throw new CloudDevError(
+        `The GitHub token lacks the ${account.missing.join(' and ')} scope Create a token with repo and workflow scopes`,
+        403,
+        'token-scopes',
+      )
+    const automatic = choice === ''
+    const engine = new CloudEngine(gateway, automatic ? `${account.login}/${AUTOMATIC_RUNNER}` : choice, token)
     let repository: { private: boolean }
     try {
       repository = await engine.github.json(engine.github.repo(), { signal })
     } catch (error) {
-      if (!automatic || !(error instanceof CloudDevError) || error.status !== 404) throw error
+      if (!(error instanceof CloudDevError) || error.status !== 404) throw error
+      if (!automatic)
+        throw new CloudDevError(
+          `Runner repository ${choice} was not found or the token cannot access it`,
+          404,
+          'runner-missing',
+        )
       try {
         repository = await engine.github.json('user/repos', {
           method: 'POST',
           body: {
-            name: 'dsh-cloud-runner',
+            name: AUTOMATIC_RUNNER,
             private: true,
             auto_init: true,
             description: 'Private cloud compute for DSH programming tasks',
@@ -98,12 +101,18 @@ export class CloudEngine {
           signal,
         })
       } catch (error) {
+        if (error instanceof CloudDevError && (error.status === 403 || error.status === 404))
+          throw new CloudDevError('The token cannot create the private runner repository', error.status, 'runner-denied')
         if (!(error instanceof CloudDevError) || error.status !== 422) throw error
         repository = await engine.github.json(engine.github.repo(), { signal })
       }
     }
     if (automatic && repository.private !== true)
-      throw new CloudDevError('The automatic runner must be private Choose another private runner repository')
+      throw new CloudDevError(
+        `${engine.repository} is public The automatic runner must be private Choose a private runner repository`,
+        undefined,
+        'runner-denied',
+      )
     return engine
   }
 
@@ -117,7 +126,7 @@ export class CloudEngine {
   /** Install or update the runner workflow on the default branch. */
   async installWorkflow(signal?: AbortSignal): Promise<'created' | 'updated' | 'unchanged'> {
     const branch = await this.defaultBranch(signal)
-    const path = this.github.repo(`/contents/.github/workflows/${this.settings.workflow}`)
+    const path = this.github.repo(`/contents/${RUNNER_WORKFLOW_PATH}`)
     let sha: string | undefined
     try {
       const current = await this.github.json<{ sha: string; content: string }>(
@@ -133,30 +142,27 @@ export class CloudEngine {
     } catch (error) {
       if (!(error instanceof CloudDevError) || error.status !== 404) throw error
     }
-    await this.github.json(path, {
-      method: 'PUT',
-      body: {
-        message: 'Install the DSH cloud run workflow',
-        content: base64(new TextEncoder().encode(RUNNER_WORKFLOW)),
-        branch,
-        ...(sha === undefined ? {} : { sha }),
-      },
-      ...(signal ? { signal } : {}),
-    })
-    return sha === undefined ? 'created' : 'updated'
-  }
-
-  /** Whether the runner workflow exists on the default branch. */
-  async workflowInstalled(signal?: AbortSignal): Promise<boolean> {
     try {
-      await this.github.json(this.github.repo(`/actions/workflows/${this.settings.workflow}`), {
+      await this.github.json(path, {
+        method: 'PUT',
+        body: {
+          message: 'Install the DSH cloud run workflow',
+          content: base64(new TextEncoder().encode(RUNNER_WORKFLOW)),
+          branch,
+          ...(sha === undefined ? {} : { sha }),
+        },
         ...(signal ? { signal } : {}),
       })
-      return true
     } catch (error) {
-      if (error instanceof CloudDevError && error.status === 404) return false
+      if (error instanceof CloudDevError && (error.status === 403 || error.status === 404))
+        throw new CloudDevError(
+          `The token cannot write the runner workflow in ${this.repository} Grant repo and workflow access`,
+          error.status,
+          'runner-denied',
+        )
       throw error
     }
+    return sha === undefined ? 'created' : 'updated'
   }
 
   private async createTree(
@@ -167,7 +173,7 @@ export class CloudEngine {
     let tree: string | undefined
     let chunk: object[] = [
       { path: ORIGIN_FILE, mode: '100644', type: 'blob', content: JSON.stringify(origin) },
-      { path: `.github/workflows/${this.settings.workflow}`, mode: '100644', type: 'blob', content: RUNNER_WORKFLOW },
+      { path: RUNNER_WORKFLOW_PATH, mode: '100644', type: 'blob', content: RUNNER_WORKFLOW },
       { path: 'workspace/.dsh-cloud-root', mode: '100644', type: 'blob', content: '' },
     ]
     let size = 0
@@ -248,7 +254,7 @@ export class CloudEngine {
     try {
       for (let attempt = 0; ; attempt++) {
         try {
-          await this.github.json(this.github.repo(`/actions/workflows/${this.settings.workflow}/dispatches`), {
+          await this.github.json(this.github.repo(`/actions/workflows/${RUNNER_WORKFLOW_FILE}/dispatches`), {
             method: 'POST',
             body: {
               ref,
@@ -306,7 +312,7 @@ export class CloudEngine {
   /** Current state of one job. */
   async job(id: string, signal?: AbortSignal): Promise<CloudJob> {
     this.jobId(id)
-    const job = await this.github.findRun(this.settings.workflow, id, signal)
+    const job = await this.github.findRun(RUNNER_WORKFLOW_FILE, id, signal)
     if (job !== undefined) return job
     await this.github.json(this.github.repo(`/git/ref/heads/${JOB_BRANCH_PREFIX}${this.jobId(id)}`), {
       ...(signal ? { signal } : {}),
