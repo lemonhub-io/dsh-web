@@ -89,6 +89,13 @@ async function missingLazy(cache) {
 
 let filling
 
+async function activateIfAlone() {
+  const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  if (windows.length > 1) return false
+  await self.skipWaiting()
+  return true
+}
+
 /** Fetch on-demand grammars, fonts, and chunks once the app runs, so every page works offline. */
 function fillLazy() {
   filling ??= (async () => {
@@ -108,6 +115,9 @@ async function offlineStatus() {
 self.addEventListener('message', (event) => {
   const reply = event.ports[0]
   if (event.data === 'skip-waiting') void self.skipWaiting()
+  // A window that has not started its host asks this waiting version to take over at once, which is
+  // safe only while no other window runs the current version.
+  else if (event.data === 'activate-if-alone') event.waitUntil(activateIfAlone().then((activated) => { reply?.postMessage({ activated }) }))
   else if (event.data === 'offline-status') event.waitUntil(offlineStatus().then((status) => { reply?.postMessage(status) }))
   else if (event.data === 'fill-offline') event.waitUntil(fillLazy().then(offlineStatus).then((status) => { reply?.postMessage(status) }))
 })

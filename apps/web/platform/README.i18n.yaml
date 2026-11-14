@@ -3,5 +3,5 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write apps/web/platform/README.md
 /deploying-dsh-web:
-  en: dd7aad7061074ad9
-  zh: 299d5c734cf95e61
+  en: 60f4927603886ffc
+  zh: 6c4ca8ac550a828a

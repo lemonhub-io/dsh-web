@@ -24,8 +24,14 @@ export function BrowserAppRow({ t }: PropsRuntime<'settings.general.item'> & Pro
     listener => app?.subscribeInstall(listener) ?? (() => undefined),
     () => app?.installState(),
   )
+  const update = useSyncExternalStore(
+    listener => app?.subscribeUpdate(listener) ?? (() => undefined),
+    () => app?.updateState(),
+  )
   const [offline, setOffline] = useState<boolean>()
-  const [update, setUpdate] = useState<'current' | 'available'>()
+  // Set by a manual check that found nothing newer; an update arriving later replaces the line.
+  const [checked, setChecked] = useState(false)
+  const [version, setVersion] = useState<string>()
   const [storage, setStorage] = useState<Awaited<ReturnType<NonNullable<typeof app>['storage']>>>()
   const [refused, setRefused] = useState(false)
   const [notifications, setNotifications] = useState(() => app?.notificationState())
@@ -34,6 +40,7 @@ export function BrowserAppRow({ t }: PropsRuntime<'settings.general.item'> & Pro
   useEffect(() => {
     if (app === undefined) return
     void app.offlineReady().then(setOffline, () => undefined)
+    void app.version().then(setVersion, () => undefined)
     void app.storage().then(setStorage, () => undefined)
   }, [app])
 
@@ -51,18 +58,23 @@ export function BrowserAppRow({ t }: PropsRuntime<'settings.general.item'> & Pro
         <div className={css.title}>{t('webApp.title')}</div>
         <div className={css.description}>{t(installCopy)}</div>
         {offline !== undefined && <div className={css.description}>{t(offline ? 'webApp.offlineReady' : 'webApp.offlinePreparing')}</div>}
-        {update !== undefined && <div role="status" className={css.description}>{t(update === 'current' ? 'webApp.current' : 'webApp.updateAvailable')}</div>}
+        <div role="status" className={css.description}>
+          {update === 'ready' ? t('webApp.updateReady') : update === 'downloading' ? t('webApp.updateDownloading') : checked ? t('webApp.current') : null}
+        </div>
+        {version !== undefined && <div className={css.description}>{t('webApp.version', { version: version.slice(0, 8) })}</div>}
       </div>
       <div className={css.actions}>
         {install === 'available' && <Button variant="outline" size="sm" disabled={busy} onClick={() => { run(() => app.install()) }}>{t('webApp.install')}</Button>}
-        <Button variant="outline" size="sm" disabled={busy} onClick={() => {
-          run(async () => {
-            const result = await app.checkForUpdate()
-            if (result !== 'unavailable') setUpdate(result)
-            // The check waits for a first install to finish, so offline readiness may have changed.
-            setOffline(await app.offlineReady())
-          })
-        }}>{t('webApp.check')}</Button>
+        {update === 'ready'
+          ? <Button variant="primary" size="sm" onClick={() => { app.applyUpdate() }}>{t('webApp.applyUpdate')}</Button>
+          : <Button variant="outline" size="sm" disabled={busy || update === 'downloading'} onClick={() => {
+            run(async () => {
+              setChecked((await app.checkForUpdate()) === 'current')
+              // The check waits for a first install to finish, so offline readiness and the version may have changed.
+              setOffline(await app.offlineReady())
+              setVersion(await app.version())
+            })
+          }}>{t('webApp.check')}</Button>}
       </div>
     </div>
     {storage !== undefined && <div className={css.row}>

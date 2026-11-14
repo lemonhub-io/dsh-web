@@ -226,6 +226,23 @@ it('installs, works offline, takes launches, and updates only what changed', { t
     // Accepting it reloads into the new page.
     await notice.getByRole('button', { name: 'Reload' }).click()
     await expect.poll(() => page.evaluate(() => document.querySelector('meta[name="dsh-e2e"]')?.getAttribute('content')).catch(() => undefined), { timeout: 60_000 }).toBe('next')
+
+    // A version put off with Later takes over by itself on the next start, before the harness runs.
+    await composer(page).waitFor({ timeout: BOOT_TIMEOUT_MS })
+    indexOverride = index.replace('</head>', '<meta name="dsh-e2e" content="third" /></head>')
+    const thirdHash = createHash('sha256').update(indexOverride).digest('hex').slice(0, 16)
+    serviceWorker = swSource.replace(currentHash, thirdHash).replace(/const VERSION = '[^']+'/u, "const VERSION = 'e2e-third'")
+    expect(await page.evaluate(() => {
+      type App = { checkForUpdate(): Promise<string> }
+      return (globalThis as unknown as { __DSH_WEB_PLATFORM__: { app: App } }).__DSH_WEB_PLATFORM__.app.checkForUpdate()
+    })).toBe('available')
+    const third = page.locator('[data-dsh-toast]', { hasText: 'A new version is ready' })
+    await third.waitFor({ timeout: 60_000 })
+    await third.getByRole('button', { name: 'Later' }).click()
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect.poll(() => page.evaluate(() => document.querySelector('meta[name="dsh-e2e"]')?.getAttribute('content')).catch(() => undefined), { timeout: 60_000 }).toBe('third')
+    await composer(page).waitFor({ timeout: BOOT_TIMEOUT_MS })
+    expect(await page.locator('[data-dsh-toast]', { hasText: 'A new version is ready' }).count()).toBe(0)
   } finally {
     await browser.close()
     server.close()

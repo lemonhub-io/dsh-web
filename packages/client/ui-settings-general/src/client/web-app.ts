@@ -18,6 +18,10 @@ export interface WebAppBridge {
   install(): Promise<void>
   offlineReady(): Promise<boolean | undefined>
   checkForUpdate(): Promise<'current' | 'available' | 'unavailable'>
+  updateState(): 'idle' | 'downloading' | 'ready'
+  subscribeUpdate(listener: () => void): () => void
+  applyUpdate(): void
+  version(): Promise<string | undefined>
   storage(): Promise<{ readonly usage: number; readonly quota: number; readonly persisted: boolean } | undefined>
   protectStorage(): Promise<boolean>
   notificationState(): 'on' | 'off' | 'blocked' | 'unavailable'
@@ -37,7 +41,9 @@ interface AttentionStatus {
 /** The harness services the application layer drives. */
 export interface WebAppServices {
   readonly sessionStatus: ObservableSnapshot<ReadonlyMap<string, AttentionStatus>>
-  readonly sessionList: ObservableSnapshot<{ readonly byId: Readonly<Record<string, { readonly title?: string | null; readonly subagent?: unknown } | undefined>> }>
+  readonly sessionList: ObservableSnapshot<{
+    readonly byId: Readonly<Record<string, { readonly title?: string | null; readonly subagent?: unknown } | undefined>>
+  }>
   readonly workspace: {
     startSession(): void
     openSession(sessionId: string): void

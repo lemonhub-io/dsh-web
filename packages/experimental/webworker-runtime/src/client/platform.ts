@@ -263,7 +263,11 @@ export interface WebPlatformBridge {
   readonly app: WebAppBridge
 }
 
-function startBridge(port: MessagePort, app: WebAppBridge): { bridge: WebPlatformBridge; settleReply(frame: Extract<HostToPageFrame, { t: 'reply' }>): void } {
+function startBridge(port: MessagePort, app: WebAppBridge): {
+  bridge: WebPlatformBridge
+  flush(): Promise<void>
+  settleReply(frame: Extract<HostToPageFrame, { t: 'reply' }>): void
+} {
   const pending = new Map<number, { settle(value: unknown): void; fail(reason: Error): void }>()
   let nextId = 0
   const request = async (operation: PlatformRequest, transfer: Transferable[] = []): Promise<unknown> => {
@@ -288,6 +292,7 @@ function startBridge(port: MessagePort, app: WebAppBridge): { bridge: WebPlatfor
         location.reload()
       },
     },
+    flush: async () => { await request({ op: 'flush' }) },
     settleReply: (frame) => {
       const waiter = pending.get(frame.id)
       pending.delete(frame.id)
@@ -302,7 +307,12 @@ function startBridge(port: MessagePort, app: WebAppBridge): { bridge: WebPlatfor
  * A launch that opened this window goes to the tab holding the lock instead of taking it.
  * @returns the opening intent, unless the tab holding the lock took it.
  */
-async function acquireHostLock(screen: BootScreen, app: WebApp, opening: LaunchIntent | undefined, onLost: () => void): Promise<LaunchIntent | undefined> {
+async function acquireHostLock(
+  screen: BootScreen,
+  app: WebApp,
+  opening: LaunchIntent | undefined,
+  onLost: () => void,
+): Promise<LaunchIntent | undefined> {
   if (!('locks' in navigator)) return opening
   const hold = (options: LockOptions): Promise<boolean> => new Promise((acquired, failed) => {
     navigator.locks.request(HOST_LOCK, options, async (lock) => {
@@ -364,7 +374,9 @@ export async function startWebPlatform(options: WebPlatformOptions): Promise<voi
     if (typeof indexedDB !== 'undefined') indexedDB.deleteDatabase(RETIRED_FOLDER_DATABASE)
     const channel = new MessageChannel()
     const { port1: port, port2: remote } = channel
-    const { bridge, settleReply } = startBridge(port, app.bridge)
+    const { bridge, flush, settleReply } = startBridge(port, app.bridge)
+    // Switching versions reloads the page, so durable storage is written first.
+    app.setReloadGuard(flush)
     ;(globalThis as { __DSH_WEB_PLATFORM__?: WebPlatformBridge }).__DSH_WEB_PLATFORM__ = bridge
     port.onmessage = (event: MessageEvent<HostToPageFrame>) => {
       const frame = event.data
