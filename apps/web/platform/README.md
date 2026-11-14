@@ -21,4 +21,4 @@ To refresh the screenshots in the install dialog, run `pnpm exec tsx scripts/cap
 
 DSH Web uses API keys only. Account login, account settings, and the account model route are disabled in the Worker image; the sidebar keeps Settings, and first-use model setup opens the API-key editor directly.
 
-The live site is `dsh.daum.pw`, a block in `/etc/caddy/Caddyfile`.
+The live site is `dsh.openhub.today`. The `dsh-openhub` Cloudflare tunnel forwards it to a loopback Caddy listener on `127.0.0.1:3092`, a block in `/etc/caddy/Caddyfile`. The old address `dsh.daum.pw` redirects there.

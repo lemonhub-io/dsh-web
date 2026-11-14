@@ -229,7 +229,7 @@ export function CloudPage(props: CloudPageProps): ReactNode {
             <h2>{t('settingsTitle')}</h2>
             <label className={css.field}>
               <span>{t('gatewayUrl')}</span>
-              <Input value={settings.gatewayUrl} placeholder="https://dsh-cloud-gateway.example.workers.dev" spellCheck={false}
+              <Input value={settings.gatewayUrl} placeholder="https://gateway.example.com" spellCheck={false}
                 onChange={(event) => { setSettings({ ...settings, gatewayUrl: event.target.value }) }} />
             </label>
             <label className={css.field}>

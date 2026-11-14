@@ -22,7 +22,7 @@ Cloud development hands build and run work to GitHub Actions. DSH Web stays a st
 <a id="use-this-package"></a>
 ## Use this package
 
-1. Deploy the gateway: `CF_WORKERS_TOKEN=... pnpm --filter @deepseek-ai/dsh-experimental-cloud-dev run deploy:gateway`. The token needs Workers Scripts edit permission. Set `DSH_GATEWAY_HOSTNAME` to bind a custom domain, and `DSH_GATEWAY_ORIGINS` to list the Web origins allowed to call it. `wrangler dev` in `gateway/` runs the same Worker locally. The panel defaults to the public gateway `https://dsh-cloud-gateway.mzhub.workers.dev`, which accepts `https://dsh.daum.pw` and localhost.
+1. Deploy the gateway with `wrangler deploy` in `gateway/`, or with `CF_WORKERS_TOKEN=... pnpm --filter @deepseek-ai/dsh-experimental-cloud-dev run deploy:gateway`. The token needs Workers Scripts edit and Workers Routes edit permissions. Both bind the custom domain `dsh-gw.openhub.today`; `DSH_GATEWAY_HOSTNAME` and `DSH_GATEWAY_ORIGINS` override the domain and the Web origins allowed to call it. `wrangler dev` in `gateway/` runs the same Worker locally. The panel defaults to the public gateway `https://dsh-gw.openhub.today`, which accepts `https://dsh.openhub.today` and localhost.
 2. Create a private runner repository with at least one commit on its default branch.
 3. In the panel, enter the gateway URL, the repository as `owner/name`, and a GitHub token with `repo` and `workflow` scopes. The token is stored as the `DSH_CLOUD_GITHUB_TOKEN` credential, never in the settings file.
 4. Select **Set up runner repository** to install `.github/workflows/dsh-cloud-run.yml`.

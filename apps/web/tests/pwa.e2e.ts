@@ -39,7 +39,8 @@ async function storedDirectory(page: Page, path: string): Promise<boolean> {
 /** Store a credential over the page's tunnel, which also ends the first-launch dialog. */
 async function setCredential(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const { fetch: tunnelFetch } = (globalThis as unknown as { __DSH_TRANSPORT__: { fetch(input: string, init: RequestInit): Promise<Response> } }).__DSH_TRANSPORT__
+    type Transport = { fetch(input: string, init: RequestInit): Promise<Response> }
+    const { fetch: tunnelFetch } = (globalThis as unknown as { __DSH_TRANSPORT__: Transport }).__DSH_TRANSPORT__
     const response = await tunnelFetch('/api/credentials/set', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -130,7 +131,10 @@ it('installs, works offline, takes launches, and updates only what changed', { t
     expect(installability.map(error => error.errorId).filter(id => id !== 'in-incognito')).toEqual([])
 
     // After boot every file is stored, so no page needs the network once the app ran.
-    const offlineReady = (): Promise<boolean | undefined> => page.evaluate(() => (globalThis as unknown as { __DSH_WEB_PLATFORM__: { app: { offlineReady(): Promise<boolean | undefined> } } }).__DSH_WEB_PLATFORM__.app.offlineReady())
+    const offlineReady = (): Promise<boolean | undefined> => page.evaluate(() => {
+      type App = { offlineReady(): Promise<boolean | undefined> }
+      return (globalThis as unknown as { __DSH_WEB_PLATFORM__: { app: App } }).__DSH_WEB_PLATFORM__.app.offlineReady()
+    })
     await expect.poll(offlineReady, { timeout: 120_000, interval: 1000 }).toBe(true)
     await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null), { timeout: 20_000 }).toBe(true)
 
@@ -161,8 +165,9 @@ it('installs, works offline, takes launches, and updates only what changed', { t
     await page.getByText('Browser data').waitFor({ timeout: BOOT_TIMEOUT_MS })
     expect(new URL(page.url()).search).toBe('')
     await page.getByRole('button', { name: 'Check for updates' }).click()
-    await page.getByText('You have the latest version').waitFor({ timeout: 20_000 })
-    await page.getByText('All files are saved for offline use').waitFor({ timeout: 20_000 })
+    // The check waits for the first install, which caches the whole image and is slow on CI runners.
+    await page.getByText('You have the latest version').waitFor({ timeout: 120_000 })
+    await page.getByText('All files are saved for offline use').waitFor({ timeout: 30_000 })
     await page.keyboard.press('Escape')
 
     // Headless Chromium accepts notifications without showing or listing them, so this checks the call.
@@ -173,7 +178,12 @@ it('installs, works offline, takes launches, and updates only what changed', { t
         calls.push({ title, data: options?.data })
         await original.call(this, title, options)
       }
-      const { app } = (globalThis as unknown as { __DSH_WEB_PLATFORM__: { app: { setNotifications(on: boolean): Promise<void>; notify(title: string, body: string, id: string): void; setBadge(count: number): void } } }).__DSH_WEB_PLATFORM__
+      type App = {
+        setNotifications(on: boolean): Promise<void>
+        notify(title: string, body: string, id: string): void
+        setBadge(count: number): void
+      }
+      const { app } = (globalThis as unknown as { __DSH_WEB_PLATFORM__: { app: App } }).__DSH_WEB_PLATFORM__
       app.notify('Before enabling', 'A title', 'session-id')
       await app.setNotifications(true)
       app.notify('Session finished', 'A title', 'session-id')
@@ -204,7 +214,10 @@ it('installs, works offline, takes launches, and updates only what changed', { t
     expect(swSource).toContain(currentHash)
     serviceWorker = swSource.replace(currentHash, nextHash).replace(/const VERSION = '[^']+'/u, "const VERSION = 'e2e-next'")
     requested.length = 0
-    const result = await page.evaluate(() => (globalThis as unknown as { __DSH_WEB_PLATFORM__: { app: { checkForUpdate(): Promise<string> } } }).__DSH_WEB_PLATFORM__.app.checkForUpdate())
+    const result = await page.evaluate(() => {
+      type App = { checkForUpdate(): Promise<string> }
+      return (globalThis as unknown as { __DSH_WEB_PLATFORM__: { app: App } }).__DSH_WEB_PLATFORM__.app.checkForUpdate()
+    })
     expect(result).toBe('available')
     const notice = page.locator('[data-dsh-toast]', { hasText: 'A new version is ready' })
     await notice.waitFor({ timeout: 60_000 })

@@ -30,7 +30,7 @@ declare module '@deepseek-ai/cordis' {
 
 /** Credential reference holding the GitHub token used for the runner repository. */
 export const TOKEN_REF = 'DSH_CLOUD_GITHUB_TOKEN'
-const DEFAULT_SETTINGS: CloudDevSettings = { gatewayUrl: 'https://dsh-cloud-gateway.mzhub.workers.dev', repository: '', workflow: 'dsh-cloud-run.yml' }
+const DEFAULT_SETTINGS: CloudDevSettings = { gatewayUrl: 'https://dsh-gw.openhub.today', repository: '', workflow: 'dsh-cloud-run.yml' }
 const LOG_TAIL = 6000
 
 function failure(error: unknown): never {

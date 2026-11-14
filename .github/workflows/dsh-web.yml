@@ -1,7 +1,7 @@
 name: DSH Web
 
 # Builds the browser build of DSH Web and runs its installed-app and web-platform
-# end-to-end tests. Pushes to web-platform also publish the build to dsh.daum.pw
+# end-to-end tests. Pushes to web-platform also publish the build to dsh.openhub.today
 # once the publish job is enabled; see apps/web/platform/README.md.
 on:
   push:
@@ -65,7 +65,7 @@ jobs:
         run: pnpm exec vitest run --config vitest.web.config.ts apps/web/tests/pwa.e2e.ts apps/web/tests/web-platform.e2e.ts apps/web/tests/cordis-community.e2e.ts
 
   publish:
-    name: Publish to dsh.daum.pw
+    name: Publish to dsh.openhub.today
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/web-platform' && vars.DSH_WEB_SSH_DEPLOY == 'true'
     runs-on: ubuntu-24.04
@@ -92,6 +92,6 @@ jobs:
       - name: Confirm the live version
         run: |
           expected=$(grep -o "const VERSION = '[^']*'" dist-site/sw.js)
-          live=$(curl -fsS "https://dsh.daum.pw/sw.js?ci=${GITHUB_SHA}" | grep -o "const VERSION = '[^']*'")
+          live=$(curl -fsS "https://dsh.openhub.today/sw.js?ci=${GITHUB_SHA}" | grep -o "const VERSION = '[^']*'")
           test -n "$expected" && test "$live" = "$expected"
           echo "live: $expected"

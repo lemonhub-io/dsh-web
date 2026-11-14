@@ -6,6 +6,8 @@
  * @module @deepseek-ai/dsh-experimental-webworker-runtime/src/client/pwa
  */
 
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
+
 const LAUNCH_CHANNEL = 'dsh-web-launch'
 const SHARE_CACHE = 'dsh-share'
 const HANDOVER_TIMEOUT_MS = 1500
@@ -13,6 +15,8 @@ const COMPOSER_TIMEOUT_MS = 300_000
 const COMPOSER_NOTICE_MS = 3000
 const UPDATE_INTERVAL_MS = 60 * 60 * 1000
 const UPDATE_ON_RETURN_MS = 15 * 60 * 1000
+/** Longest a manual update check waits for the first install to finish. */
+const FIRST_INSTALL_WAIT_MS = 90 * 1000
 const INSTALL_OFFER_DELAY_MS = 45_000
 const INSTALL_OFFER_MS = 20_000
 const NOTIFICATIONS_KEY = 'dsh-web-notifications'
@@ -245,7 +249,7 @@ export class WebApp {
   async handOver(intent: LaunchIntent): Promise<boolean> {
     if (typeof BroadcastChannel === 'undefined') return false
     const channel = new BroadcastChannel(LAUNCH_CHANNEL)
-    const id = crypto.randomUUID()
+    const id = randomUUID()
     try {
       return await new Promise<boolean>((settle) => {
         const timer = setTimeout(() => { settle(false) }, HANDOVER_TIMEOUT_MS)
@@ -317,13 +321,18 @@ export class WebApp {
     checkForUpdate: async () => {
       const registration = this.registration
       if (registration === undefined) return 'unavailable'
+      // During the first install the installing worker is this version, not an update: wait for it to
+      // finish (bounded, since a failed install never activates) before asking the server.
+      if (registration.active === null) {
+        await Promise.race([navigator.serviceWorker.ready, new Promise(resolve => setTimeout(resolve, FIRST_INSTALL_WAIT_MS))])
+      }
       this.lastUpdateCheck = Date.now()
       await registration.update()
       if (registration.waiting !== null) {
         this.offeredUpdate = undefined
         this.offerUpdate(registration.waiting)
       }
-      return registration.waiting !== null || registration.installing !== null ? 'available' : 'current'
+      return registration.active !== null && (registration.waiting !== null || registration.installing !== null) ? 'available' : 'current'
     },
     storage: async () => {
       if (navigator.storage?.estimate === undefined) return undefined

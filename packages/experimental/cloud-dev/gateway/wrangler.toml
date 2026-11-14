@@ -2,8 +2,9 @@
 name = "dsh-cloud-gateway"
 main = "worker.js"
 compatibility_date = "2026-10-01"
-workers_dev = true
+workers_dev = false
+routes = [{ pattern = "dsh-gw.openhub.today", custom_domain = true }]
 
 [vars]
 # Comma-separated browser origins allowed to read responses; localhost is allowed for development.
-ALLOWED_ORIGINS = "https://dsh.daum.pw"
+ALLOWED_ORIGINS = "https://dsh.openhub.today"

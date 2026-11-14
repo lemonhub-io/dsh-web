@@ -35,7 +35,7 @@ const STORAGE_HOST = /(?:^|\.)(?:blob\.core\.windows\.net|actions\.githubusercon
  */
 export function allowedOrigin(origin, env) {
   if (origin === null || origin === '') return null
-  const list = (env.ALLOWED_ORIGINS ?? 'https://dsh.daum.pw').split(',').map(item => item.trim()).filter(Boolean)
+  const list = (env.ALLOWED_ORIGINS ?? 'https://dsh.openhub.today').split(',').map(item => item.trim()).filter(Boolean)
   if (list.includes('*') || list.includes(origin)) return origin
   if (env.ALLOW_LOCALHOST !== 'false' && /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin)) return origin
   return null

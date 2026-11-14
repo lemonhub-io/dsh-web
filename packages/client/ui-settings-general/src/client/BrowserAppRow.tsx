@@ -59,6 +59,8 @@ export function BrowserAppRow({ t }: PropsRuntime<'settings.general.item'> & Pro
           run(async () => {
             const result = await app.checkForUpdate()
             if (result !== 'unavailable') setUpdate(result)
+            // The check waits for a first install to finish, so offline readiness may have changed.
+            setOffline(await app.offlineReady())
           })
         }}>{t('webApp.check')}</Button>
       </div>

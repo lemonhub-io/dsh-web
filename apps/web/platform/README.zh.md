@@ -21,4 +21,4 @@ Service worker 中的每个文件都绑定了内容哈希。新版本只下载�
 
 DSH Web 仅使用 API Key。Worker 镜像禁用账号登录、账号设置和账号模型路由；侧栏保留设置，首次使用的模型配置直接打开 API Key 编辑器。
 
-线上站点是 `dsh.daum.pw`，配置位于 `/etc/caddy/Caddyfile` 的对应区块。
+线上站点是 `dsh.openhub.today`。`dsh-openhub` Cloudflare 隧道把它转发到本机 `127.0.0.1:3092` 的 Caddy 监听，配置位于 `/etc/caddy/Caddyfile` 的对应区块。旧地址 `dsh.daum.pw` 会跳转到这里。
