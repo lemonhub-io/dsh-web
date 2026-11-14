@@ -1,6 +1,6 @@
 /** The GitHub Actions workflow that runs cloud development jobs in the runner repository. */
 
-/** Path of the runner workflow inside the runner repository. */
+/** Default path of the runner workflow inside the runner repository. */
 export const RUNNER_WORKFLOW_PATH = '.github/workflows/dsh-cloud-run.yml'
 
 /** Artifact name holding the log, exit status and returned files of one job. */
@@ -26,6 +26,21 @@ on:
         description: Shell command run inside the snapshot
         required: true
         type: string
+      setup:
+        description: Dependency and environment preparation
+        required: false
+        type: string
+        default: ''
+      node_version:
+        description: Node version
+        required: false
+        type: string
+        default: '24'
+      python_version:
+        description: Python version
+        required: false
+        type: string
+        default: '3.12'
       workdir:
         description: Directory inside the snapshot
         required: false
@@ -47,10 +62,19 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: \${{ inputs.node_version }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: \${{ inputs.python_version }}
       - name: Run command
         shell: bash
         env:
           DSH_COMMAND: \${{ inputs.command }}
+          DSH_SETUP: \${{ inputs.setup }}
           DSH_WORKDIR: \${{ inputs.workdir }}
         run: |
           result="$GITHUB_WORKSPACE/.dsh-cloud"
@@ -59,7 +83,7 @@ jobs:
           cd "$GITHUB_WORKSPACE/workspace/$DSH_WORKDIR"
           start=$(date +%s)
           set +e
-          bash -c "$DSH_COMMAND" 2>&1 | tee "$result/output.log"
+          bash -e -c 'if [ -n "$DSH_SETUP" ]; then bash -e -o pipefail -c "$DSH_SETUP"; fi; bash -e -o pipefail -c "$DSH_COMMAND"' 2>&1 | tee "$result/output.log"
           code=\${PIPESTATUS[0]}
           set -e
           echo "$code" > "$result/exit-code"

@@ -2,9 +2,29 @@
 
 const decoder = new TextDecoder()
 
-async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
+async function inflateRaw(data: Uint8Array, limit: number): Promise<Uint8Array> {
   const stream = new Blob([new Uint8Array(data)]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
-  return new Uint8Array(await new Response(stream).arrayBuffer())
+  const reader = stream.getReader()
+  const parts: Uint8Array[] = []
+  let size = 0
+  try {
+    for (;;) {
+      const item = await reader.read()
+      if (item.done) break
+      size += item.value.length
+      if (size > limit) throw new Error('Archive is too large')
+      parts.push(item.value)
+    }
+  } finally {
+    await reader.cancel()
+  }
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const part of parts) {
+    bytes.set(part, offset)
+    offset += part.length
+  }
+  return bytes
 }
 
 /**
@@ -17,7 +37,10 @@ export async function unzip(bytes: Uint8Array, limit = 64 * 1024 * 1024): Promis
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   let end = -1
   for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 65535); i--) {
-    if (view.getUint32(i, true) === 0x06054b50) { end = i; break }
+    if (view.getUint32(i, true) === 0x06054b50) {
+      end = i
+      break
+    }
   }
   if (end < 0) throw new Error('Not a zip archive')
   const count = view.getUint16(end + 10, true)
@@ -36,14 +59,23 @@ export async function unzip(bytes: Uint8Array, limit = 64 * 1024 * 1024): Promis
     const name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLength))
     offset += 46 + nameLength + extraLength + commentLength
     if (name.endsWith('/')) continue
-    if (name.startsWith('/') || name.split('/').includes('..')) throw new Error('Unsafe zip entry ' + name)
+    if (
+      name.startsWith('/') ||
+      /^[A-Za-z]:/.test(name) ||
+      name.includes('\\') ||
+      name.includes('\0') ||
+      name.split('/').includes('..') ||
+      files.has(name)
+    )
+      throw new Error('Unsafe zip entry ' + name)
     total += size
     if (total > limit) throw new Error('Archive is too large')
     const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true)
     const data = bytes.subarray(start, start + compressedSize)
     if (method === 0) files.set(name, data.slice())
-    else if (method === 8) files.set(name, await inflateRaw(data))
+    else if (method === 8) files.set(name, await inflateRaw(data, limit - total + size))
     else throw new Error('Unsupported zip compression')
+    if (files.get(name)?.length !== size) throw new Error('Archive entry size does not match its contents')
   }
   return files
 }

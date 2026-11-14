@@ -1,9 +1,12 @@
-/** GitHub REST calls routed through the stateless gateway. */
+/** Direct GitHub management requests and gateway-backed artifact and log downloads. */
 import type { CloudJob } from './types.ts'
 
 /** A failure whose message is safe to show to the person running the job. */
 export class CloudDevError extends Error {
-  constructor(message: string, readonly status?: number) {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
     super(message)
     this.name = 'CloudDevError'
   }
@@ -21,6 +24,7 @@ interface WorkflowRun {
   created_at: string
   updated_at: string
   head_commit?: { message?: string } | null
+  head_sha?: string
 }
 
 /** Map one workflow run onto a job, or undefined for runs this plugin did not start. */
@@ -37,10 +41,11 @@ export function jobFromRun(run: WorkflowRun): CloudJob | undefined {
     url: run.html_url,
     createdAt: run.created_at,
     updatedAt: run.updated_at,
+    ...(run.head_sha === undefined ? {} : { snapshotCommit: run.head_sha }),
   }
 }
 
-/** Thin GitHub client; the gateway forwards the token and follows storage redirects. */
+/** GitHub JSON uses its native browser API Binary downloads use the gateway for storage redirects. */
 export class GitHubClient {
   constructor(
     private readonly gateway: string,
@@ -53,42 +58,51 @@ export class GitHubClient {
     return `repos/${this.repository}${path}`
   }
 
-  async request(path: string, init: { method?: string; body?: unknown; accept?: string; signal?: AbortSignal } = {}): Promise<Response> {
+  async request(
+    path: string,
+    init: { method?: string; body?: unknown; accept?: string; signal?: AbortSignal } = {},
+  ): Promise<Response> {
     let response: Response
     try {
-      response = await fetch(`${this.gateway}/github/${path}`, {
+      const binary = /\/actions\/(?:artifacts\/\d+\/zip|runs\/\d+\/logs)$/.test(path)
+      const address = binary ? `${this.gateway}/github/${path}` : `https://api.github.com/${path}`
+      response = await fetch(address, {
+        credentials: 'omit',
         method: init.method ?? 'GET',
         headers: {
           authorization: `Bearer ${this.token}`,
           accept: init.accept ?? 'application/vnd.github+json',
-          ...init.body === undefined ? {} : { 'content-type': 'application/json' },
+          ...(init.body === undefined ? {} : { 'content-type': 'application/json' }),
         },
-        ...init.body === undefined ? {} : { body: JSON.stringify(init.body) },
-        ...init.signal === undefined ? {} : { signal: init.signal },
+        ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+        signal: AbortSignal.any([AbortSignal.timeout(30000), ...(init.signal === undefined ? [] : [init.signal])]),
       })
     } catch (error) {
       if (init.signal?.aborted === true) throw error
-      throw new CloudDevError('The gateway could not be reached Check its URL')
+      throw new CloudDevError('The cloud API could not be reached Check the network and gateway connection')
     }
     if (response.ok) return response
     let detail = ''
     try {
-      const body = await response.json() as { message?: string; error?: string }
+      const body = (await response.json()) as { message?: string; error?: string }
       detail = body.message ?? body.error ?? ''
-    } catch { /* non-JSON error body */ }
+    } catch {
+      /* non-JSON error body */
+    }
     if (response.status === 401) throw new CloudDevError('GitHub rejected the token', 401)
-    if (response.status === 403 && /rate limit/i.test(detail)) throw new CloudDevError('GitHub rate limit reached Try again later', 403)
+    if (response.status === 403 && /rate limit/i.test(detail))
+      throw new CloudDevError('GitHub rate limit reached Try again later', 403)
     throw new CloudDevError(`GitHub ${response.status}${detail === '' ? '' : ' ' + detail}`, response.status)
   }
 
   async json<T>(path: string, init: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
     const response = await this.request(path, init)
     if (response.status === 204) return undefined as T
-    return await response.json() as T
+    return (await response.json()) as T
   }
 
   async bytes(path: string, signal?: AbortSignal): Promise<Uint8Array> {
-    const response = await this.request(path, { ...signal === undefined ? {} : { signal } })
+    const response = await this.request(path, { ...(signal === undefined ? {} : { signal }) })
     return new Uint8Array(await response.arrayBuffer())
   }
 
@@ -96,7 +110,7 @@ export class GitHubClient {
   async jobs(workflow: string, signal?: AbortSignal): Promise<CloudJob[]> {
     const body = await this.json<{ workflow_runs: WorkflowRun[] }>(
       this.repo(`/actions/workflows/${workflow}/runs?per_page=30&event=workflow_dispatch`),
-      { ...signal === undefined ? {} : { signal } },
+      { ...(signal === undefined ? {} : { signal }) },
     )
     return body.workflow_runs.flatMap(run => jobFromRun(run) ?? [])
   }
@@ -106,7 +120,7 @@ export class GitHubClient {
     const branch = encodeURIComponent(JOB_BRANCH_PREFIX + id)
     const body = await this.json<{ workflow_runs: WorkflowRun[] }>(
       this.repo(`/actions/workflows/${workflow}/runs?per_page=5&branch=${branch}`),
-      { ...signal === undefined ? {} : { signal } },
+      { ...(signal === undefined ? {} : { signal }) },
     )
     for (const run of body.workflow_runs) {
       const job = jobFromRun(run)

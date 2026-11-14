@@ -1,14 +1,23 @@
 /** The job lifecycle: snapshot commit, dispatch, discovery, polling, result collection and cleanup. */
 import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { CloudDevError, GitHubClient, JOB_BRANCH_PREFIX } from './github.ts'
-import { RESULT_ARTIFACT, RUNNER_WORKFLOW, RUNNER_WORKFLOW_PATH } from './runner-workflow.ts'
+import { RESULT_ARTIFACT, RUNNER_WORKFLOW } from './runner-workflow.ts'
 import { snapshot, type SnapshotFile } from './snapshot.ts'
-import type { CloudDevSettings, CloudJob, CloudJobResult, CloudRunRequest, CloudStartedJob } from './types.ts'
+import type {
+  CloudDevSettings,
+  CloudJob,
+  CloudJobResult,
+  CloudRunRequest,
+  CloudStartedJob,
+  CloudTaskOrigin,
+} from './types.ts'
 import { unzip } from './zip.ts'
 
 /** Tree requests stay well under GitHub's request body limit. */
 const TREE_CHUNK_BYTES = 4 * 1024 * 1024
+const ORIGIN_FILE = '.dsh-cloud-request.json'
 
 function base64(bytes: Uint8Array): string {
   let binary = ''
@@ -17,9 +26,16 @@ function base64(bytes: Uint8Array): string {
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve() }, ms)
-    const abort = (): void => { clearTimeout(timer); reject(signal?.reason as Error) }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort)
+      resolve()
+    }, ms)
+    const abort = (): void => {
+      clearTimeout(timer)
+      reject(signal?.reason as Error)
+    }
     signal?.addEventListener('abort', abort, { once: true })
   })
 }
@@ -31,8 +47,10 @@ export function newJobId(): string {
 
 /** Validate settings before any request leaves the browser. */
 export function checkSettings(settings: CloudDevSettings): void {
-  if (!/^https?:\/\/[^/\s]+(?:\/[^\s]*)?$/.test(settings.gatewayUrl)) throw new CloudDevError('Set the gateway URL first')
-  if (!/^[\w.-]+\/[\w.-]+$/.test(settings.repository)) throw new CloudDevError('Set the runner repository as owner/name')
+  if (!/^https?:\/\/[^/\s]+(?:\/[^\s]*)?$/.test(settings.gatewayUrl))
+    throw new CloudDevError('Set the gateway URL first')
+  if (settings.repository !== '' && !/^[\w.-]+\/[\w.-]+$/.test(settings.repository))
+    throw new CloudDevError('Set the runner repository as owner/name or leave it empty for automatic setup')
   if (!/^[\w.-]+\.ya?ml$/.test(settings.workflow)) throw new CloudDevError('The workflow must be a yml file name')
 }
 
@@ -40,24 +58,77 @@ export function checkSettings(settings: CloudDevSettings): void {
 export class CloudEngine {
   readonly github: GitHubClient
 
-  constructor(readonly settings: CloudDevSettings, token: string) {
+  constructor(
+    readonly settings: CloudDevSettings,
+    token: string,
+  ) {
     checkSettings(settings)
     this.github = new GitHubClient(settings.gatewayUrl.replace(/\/+$/, ''), token, settings.repository)
   }
 
+  /** Resolve a private runner automatically or check an explicitly selected repository.
+   * @param settings Saved connection settings An empty repository selects an account-owned private runner.
+   * @param token GitHub credential kept outside model-visible values.
+   * @param signal Cancellation.
+   * @returns Engine with its resolved repository The service installs the workflow before admitting tasks.
+   */
+  static async prepare(settings: CloudDevSettings, token: string, signal: AbortSignal): Promise<CloudEngine> {
+    checkSettings(settings)
+    let engine = new CloudEngine(settings, token)
+    const automatic = settings.repository === ''
+    if (automatic) {
+      const user = await engine.github.json<{ login: string }>('user', { signal })
+      if (!/^[\w-]+$/.test(user.login)) throw new CloudDevError('GitHub returned an invalid account')
+      engine = new CloudEngine({ ...settings, repository: `${user.login}/dsh-cloud-runner` }, token)
+    }
+    let repository: { private: boolean }
+    try {
+      repository = await engine.github.json(engine.github.repo(), { signal })
+    } catch (error) {
+      if (!automatic || !(error instanceof CloudDevError) || error.status !== 404) throw error
+      try {
+        repository = await engine.github.json('user/repos', {
+          method: 'POST',
+          body: {
+            name: 'dsh-cloud-runner',
+            private: true,
+            auto_init: true,
+            description: 'Private cloud compute for DSH programming tasks',
+          },
+          signal,
+        })
+      } catch (error) {
+        if (!(error instanceof CloudDevError) || error.status !== 422) throw error
+        repository = await engine.github.json(engine.github.repo(), { signal })
+      }
+    }
+    if (automatic && repository.private !== true)
+      throw new CloudDevError('The automatic runner must be private Choose another private runner repository')
+    return engine
+  }
+
   private async defaultBranch(signal?: AbortSignal): Promise<string> {
-    const repo = await this.github.json<{ default_branch: string }>(this.github.repo(), { ...signal ? { signal } : {} })
+    const repo = await this.github.json<{ default_branch: string }>(this.github.repo(), {
+      ...(signal ? { signal } : {}),
+    })
     return repo.default_branch
   }
 
   /** Install or update the runner workflow on the default branch. */
   async installWorkflow(signal?: AbortSignal): Promise<'created' | 'updated' | 'unchanged'> {
     const branch = await this.defaultBranch(signal)
-    const path = this.github.repo(`/contents/${RUNNER_WORKFLOW_PATH}`)
+    const path = this.github.repo(`/contents/.github/workflows/${this.settings.workflow}`)
     let sha: string | undefined
     try {
-      const current = await this.github.json<{ sha: string; content: string }>(`${path}?ref=${encodeURIComponent(branch)}`, { ...signal ? { signal } : {} })
-      if (new TextDecoder().decode(Uint8Array.from(atob(current.content.replace(/\s/g, '')), c => c.charCodeAt(0))) === RUNNER_WORKFLOW) return 'unchanged'
+      const current = await this.github.json<{ sha: string; content: string }>(
+        `${path}?ref=${encodeURIComponent(branch)}`,
+        { ...(signal ? { signal } : {}) },
+      )
+      if (
+        new TextDecoder().decode(Uint8Array.from(atob(current.content.replace(/\s/g, '')), c => c.charCodeAt(0))) ===
+        RUNNER_WORKFLOW
+      )
+        return 'unchanged'
       sha = current.sha
     } catch (error) {
       if (!(error instanceof CloudDevError) || error.status !== 404) throw error
@@ -68,9 +139,9 @@ export class CloudEngine {
         message: 'Install the DSH cloud run workflow',
         content: base64(new TextEncoder().encode(RUNNER_WORKFLOW)),
         branch,
-        ...sha === undefined ? {} : { sha },
+        ...(sha === undefined ? {} : { sha }),
       },
-      ...signal ? { signal } : {},
+      ...(signal ? { signal } : {}),
     })
     return sha === undefined ? 'created' : 'updated'
   }
@@ -78,7 +149,9 @@ export class CloudEngine {
   /** Whether the runner workflow exists on the default branch. */
   async workflowInstalled(signal?: AbortSignal): Promise<boolean> {
     try {
-      await this.github.json(this.github.repo(`/actions/workflows/${this.settings.workflow}`), { ...signal ? { signal } : {} })
+      await this.github.json(this.github.repo(`/actions/workflows/${this.settings.workflow}`), {
+        ...(signal ? { signal } : {}),
+      })
       return true
     } catch (error) {
       if (error instanceof CloudDevError && error.status === 404) return false
@@ -86,85 +159,216 @@ export class CloudEngine {
     }
   }
 
-  private async createTree(base: string, files: SnapshotFile[], signal?: AbortSignal): Promise<string> {
-    let tree = base
-    let chunk: object[] = []
+  private async createTree(
+    files: SnapshotFile[],
+    origin: CloudTaskOrigin,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    let tree: string | undefined
+    let chunk: object[] = [
+      { path: ORIGIN_FILE, mode: '100644', type: 'blob', content: JSON.stringify(origin) },
+      { path: `.github/workflows/${this.settings.workflow}`, mode: '100644', type: 'blob', content: RUNNER_WORKFLOW },
+      { path: 'workspace/.dsh-cloud-root', mode: '100644', type: 'blob', content: '' },
+    ]
     let size = 0
     const flush = async (): Promise<void> => {
       if (chunk.length === 0) return
-      const created = await this.github.json<{ sha: string }>(this.github.repo('/git/trees'), { method: 'POST', body: { base_tree: tree, tree: chunk }, ...signal ? { signal } : {} })
+      const created = await this.github.json<{ sha: string }>(this.github.repo('/git/trees'), {
+        method: 'POST',
+        body: { ...(tree === undefined ? {} : { base_tree: tree }), tree: chunk },
+        ...(signal ? { signal } : {}),
+      })
       tree = created.sha
       chunk = []
       size = 0
     }
     for (const file of files) {
       const path = 'workspace/' + file.path
-      if (file.text !== undefined) {
+      if (file.text !== undefined && file.bytes.length < TREE_CHUNK_BYTES / 2) {
         chunk.push({ path, mode: file.mode, type: 'blob', content: file.text })
       } else {
-        const blob = await this.github.json<{ sha: string }>(this.github.repo('/git/blobs'), { method: 'POST', body: { content: base64(file.bytes), encoding: 'base64' }, ...signal ? { signal } : {} })
+        const blob = await this.github.json<{ sha: string }>(this.github.repo('/git/blobs'), {
+          method: 'POST',
+          body: { content: base64(file.bytes), encoding: 'base64' },
+          ...(signal ? { signal } : {}),
+        })
         chunk.push({ path, mode: file.mode, type: 'blob', sha: blob.sha })
       }
-      size += file.text?.length ?? 64
+      size += file.bytes.length < TREE_CHUNK_BYTES / 2 ? JSON.stringify(file.text ?? '').length * 3 : 256
       if (size >= TREE_CHUNK_BYTES) await flush()
     }
     await flush()
+    if (tree === undefined) throw new CloudDevError('Snapshot tree was not created')
     return tree
   }
 
   /**
    * Snapshot a directory onto a job branch and dispatch the runner workflow.
    * @param request - command, directory and file selection.
-   * @param signal - cancellation; a cancelled start removes its branch.
-   * @returns the job once GitHub has created its run, with the snapshot size.
+   * @param signal - cancellation; uncertain dispatch retains its snapshot for recovery.
+   * @returns the accepted pending job and snapshot size Run discovery can complete later.
    */
-  async start(request: CloudRunRequest & { directory: string }, signal?: AbortSignal): Promise<CloudStartedJob> {
+  async start(
+    request: CloudRunRequest & { directory: string; owner?: string },
+    signal?: AbortSignal,
+  ): Promise<CloudStartedJob> {
     const command = request.command.trim()
     if (command === '') throw new CloudDevError('Enter a command')
     if (command.length > 20000) throw new CloudDevError('The command is too long')
-    const files = await snapshot(request.directory, request.include ?? [], signal)
+    if ((request.setup?.length ?? 0) > 20000) throw new CloudDevError('The setup command is too long')
+    for (const version of [request.nodeVersion, request.pythonVersion]) {
+      if (version !== undefined && !/^[\w.+^~<>=| -]{1,80}$/.test(version))
+        throw new CloudDevError('Invalid toolchain version')
+    }
+    const workdir = request.workdir ?? '.'
+    if (isAbsolute(workdir) || workdir.split(/[\\/]/).includes('..'))
+      throw new CloudDevError('The cloud working directory must stay inside the snapshot')
+    const files = await snapshot(request.directory, request.include ?? [], signal, [resolveDshHome()])
     const id = newJobId()
     const branch = await this.defaultBranch(signal)
-    const head = await this.github.json<{ object: { sha: string } }>(this.github.repo(`/git/ref/heads/${branch}`), { ...signal ? { signal } : {} })
-    const commit = await this.github.json<{ tree: { sha: string } }>(this.github.repo(`/git/commits/${head.object.sha}`), { ...signal ? { signal } : {} })
-    const tree = await this.createTree(commit.tree.sha, files, signal)
+    const head = await this.github.json<{ object: { sha: string } }>(this.github.repo(`/git/ref/heads/${branch}`), {
+      ...(signal ? { signal } : {}),
+    })
+    const tree = await this.createTree(files, { directory: request.directory, owner: request.owner ?? null }, signal)
     const snapshotCommit = await this.github.json<{ sha: string }>(this.github.repo('/git/commits'), {
       method: 'POST',
-      body: { message: `dsh-cloud ${id}: ${command.split('\n')[0]}`, tree, parents: [head.object.sha] },
-      ...signal ? { signal } : {},
+      body: {
+        message: `dsh-cloud ${id}: ${(request.description ?? command).split('\n')[0]}`,
+        tree,
+        parents: [head.object.sha],
+      },
+      ...(signal ? { signal } : {}),
     })
     const ref = JOB_BRANCH_PREFIX + id
-    await this.github.json(this.github.repo('/git/refs'), { method: 'POST', body: { ref: `refs/heads/${ref}`, sha: snapshotCommit.sha }, ...signal ? { signal } : {} })
+    await this.github.json(this.github.repo('/git/refs'), {
+      method: 'POST',
+      body: { ref: `refs/heads/${ref}`, sha: snapshotCommit.sha },
+      ...(signal ? { signal } : {}),
+    })
     try {
-      await this.github.json(this.github.repo(`/actions/workflows/${this.settings.workflow}/dispatches`), {
-        method: 'POST',
-        body: { ref, inputs: { job: id, command, workdir: request.workdir ?? '.', outputs: (request.outputs ?? []).join('\n') } },
-        ...signal ? { signal } : {},
-      })
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await this.github.json(this.github.repo(`/actions/workflows/${this.settings.workflow}/dispatches`), {
+            method: 'POST',
+            body: {
+              ref,
+              inputs: {
+                job: id,
+                command,
+                setup: request.setup ?? '',
+                workdir,
+                node_version: request.nodeVersion ?? '24',
+                python_version: request.pythonVersion ?? '3.12',
+                outputs: (request.outputs ?? []).join('\n'),
+              },
+            },
+            ...(signal ? { signal } : {}),
+          })
+          break
+        } catch (error) {
+          if (!(error instanceof CloudDevError) || error.status !== 404 || attempt >= 4) throw error
+          await sleep(1000, signal)
+        }
+      }
     } catch (error) {
-      await this.removeBranch(id).catch(() => undefined)
-      if (error instanceof CloudDevError && error.status === 404) throw new CloudDevError('The runner workflow is missing Set up the runner repository first', 404)
+      if (!(error instanceof CloudDevError) || error.status === undefined) {
+        throw new CloudDevError(
+          `Dispatch outcome is unknown for job ${id} Check cloud_job before starting another task`,
+        )
+      }
+      await this.removeBranch(id)
+      if (error.status === 404)
+        throw new CloudDevError(
+          'The runner workflow is not available yet Retry the task after GitHub finishes registering it',
+          404,
+        )
       throw error
     }
     const bytes = files.reduce((sum, file) => sum + file.bytes.length, 0)
-    for (let attempt = 0; attempt < 30; attempt++) {
-      const job = await this.github.findRun(this.settings.workflow, id, signal)
-      if (job !== undefined) return { job, files: files.length, bytes }
-      await sleep(2000, signal)
-    }
     const now = new Date().toISOString()
-    return { job: { id, command, status: 'pending', conclusion: null, runId: null, url: null, createdAt: now, updatedAt: now }, files: files.length, bytes }
+    return {
+      job: {
+        id,
+        command: request.description ?? command,
+        status: 'pending',
+        conclusion: null,
+        runId: null,
+        url: null,
+        snapshotCommit: snapshotCommit.sha,
+        createdAt: now,
+        updatedAt: now,
+      },
+      files: files.length,
+      bytes,
+    }
   }
 
   /** Current state of one job. */
   async job(id: string, signal?: AbortSignal): Promise<CloudJob> {
+    this.jobId(id)
     const job = await this.github.findRun(this.settings.workflow, id, signal)
-    if (job === undefined) throw new CloudDevError(`Job ${id} was not found`, 404)
-    return job
+    if (job !== undefined) return job
+    await this.github.json(this.github.repo(`/git/ref/heads/${JOB_BRANCH_PREFIX}${this.jobId(id)}`), {
+      ...(signal ? { signal } : {}),
+    })
+    const now = new Date().toISOString()
+    return {
+      id,
+      command: '',
+      status: 'pending',
+      conclusion: null,
+      runId: null,
+      url: null,
+      createdAt: now,
+      updatedAt: now,
+    }
+  }
+
+  private jobId(id: string): string {
+    if (!/^[a-z0-9]+-[a-z0-9-]+$/.test(id)) throw new CloudDevError('Invalid cloud job id')
+    return id
+  }
+
+  /** Verify an AI task's immutable Session and workspace origin before controls or collection.
+   * @param id Cloud job identity.
+   * @param owner Calling Session identity.
+   * @param directory Calling workspace directory.
+   * @param signal Cancellation.
+   * @returns The verified origin used for result collection.
+   */
+  async origin(id: string, owner: string, directory: string, signal: AbortSignal): Promise<CloudTaskOrigin> {
+    this.jobId(id)
+    const job = await this.job(id, signal)
+    const ref = job.snapshotCommit ?? JOB_BRANCH_PREFIX + id
+    const stored = await this.github.json<{ content: string }>(
+      this.github.repo(`/contents/${ORIGIN_FILE}?ref=${encodeURIComponent(ref)}`),
+      { signal },
+    )
+    const value: unknown = JSON.parse(
+      new TextDecoder().decode(Uint8Array.from(atob(stored.content.replace(/\s/g, '')), c => c.charCodeAt(0))),
+    )
+    if (
+      typeof value !== 'object' ||
+      value === null ||
+      !('directory' in value) ||
+      !('owner' in value) ||
+      typeof value.directory !== 'string' ||
+      !isAbsolute(value.directory) ||
+      value.owner !== owner ||
+      value.directory !== directory
+    ) {
+      throw new CloudDevError('This cloud task belongs to another Session or workspace', 403)
+    }
+    return { directory: value.directory, owner }
   }
 
   /** Wait until a job completes, or until the deadline passes. */
-  async wait(id: string, timeoutMs: number, signal?: AbortSignal, onUpdate?: (job: CloudJob) => void): Promise<CloudJob> {
+  async wait(
+    id: string,
+    timeoutMs: number,
+    signal?: AbortSignal,
+    onUpdate?: (job: CloudJob) => void,
+  ): Promise<CloudJob> {
     const deadline = Date.now() + timeoutMs
     let job = await this.job(id, signal)
     while (job.status !== 'completed' && Date.now() < deadline) {
@@ -177,9 +381,19 @@ export class CloudEngine {
 
   /** Cancel a queued or running job. */
   async cancel(id: string, signal?: AbortSignal): Promise<CloudJob> {
-    const job = await this.job(id, signal)
-    if (job.runId !== null && job.status !== 'completed') {
-      await this.github.json(this.github.repo(`/actions/runs/${job.runId}/cancel`), { method: 'POST', ...signal ? { signal } : {} })
+    let job = await this.job(id, signal)
+    const deadline = Date.now() + 25000
+    while (job.runId === null && Date.now() < deadline) {
+      await sleep(1000, signal)
+      job = await this.job(id, signal)
+    }
+    if (job.runId === null)
+      throw new CloudDevError(`Cancellation is unconfirmed for job ${id} Check cloud_job before rerunning`, 409)
+    if (job.status !== 'completed') {
+      await this.github.json(this.github.repo(`/actions/runs/${job.runId}/cancel`), {
+        method: 'POST',
+        ...(signal ? { signal } : {}),
+      })
     }
     return await this.job(id, signal)
   }
@@ -199,16 +413,42 @@ export class CloudEngine {
   async collect(id: string, directory: string, signal?: AbortSignal): Promise<CloudJobResult> {
     const job = await this.job(id, signal)
     if (job.status !== 'completed' || job.runId === null) throw new CloudDevError(`Job ${id} has not finished`, 409)
-    const artifacts = await this.github.json<{ artifacts: { id: number; name: string; expired: boolean }[] }>(this.github.repo(`/actions/runs/${job.runId}/artifacts`), { ...signal ? { signal } : {} })
+    const artifacts = await this.github.json<{ artifacts: { id: number; name: string; expired: boolean }[] }>(
+      this.github.repo(`/actions/runs/${job.runId}/artifacts`),
+      { ...(signal ? { signal } : {}) },
+    )
     const artifact = artifacts.artifacts.find(item => item.name === RESULT_ARTIFACT && !item.expired)
     const target = join(directory, '.dsh-cloud', id)
     if (artifact === undefined) {
-      return { job, exitCode: null, durationSeconds: null, log: 'The run produced no result artifact Open it on GitHub for details', directory: target, files: [] }
+      const logs = await unzip(await this.github.bytes(this.github.repo(`/actions/runs/${job.runId}/logs`), signal))
+      const log = [...logs].map(([name, bytes]) => name + '\n' + new TextDecoder().decode(bytes)).join('\n')
+      await mkdir(target, { recursive: true })
+      await writeFile(join(target, 'output.log'), log)
+      return {
+        job,
+        exitCode: null,
+        durationSeconds: null,
+        log: 'The runner failed before producing task artifacts Inspect these workflow logs\n' + log,
+        directory: target,
+        files: [],
+      }
     }
-    const entries = await unzip(await this.github.bytes(this.github.repo(`/actions/artifacts/${artifact.id}/zip`), signal))
+    const entries = await unzip(
+      await this.github.bytes(this.github.repo(`/actions/artifacts/${artifact.id}/zip`), signal),
+    )
     const text = (name: string): string | undefined => {
       const bytes = entries.get(name)
       return bytes === undefined ? undefined : new TextDecoder().decode(bytes)
+    }
+    const exitText = text('exit-code')?.trim()
+    const durationText = text('duration-seconds')?.trim()
+    const exitCode = exitText === undefined || exitText === '' ? null : Number(exitText)
+    const duration = durationText === undefined || durationText === '' ? null : Number(durationText)
+    if (
+      (exitCode !== null && (!Number.isInteger(exitCode) || exitCode < 0 || exitCode > 255)) ||
+      (duration !== null && (!Number.isFinite(duration) || duration < 0))
+    ) {
+      throw new CloudDevError('The cloud result metadata is invalid The task outcome cannot be trusted')
     }
     const files: string[] = []
     for (const [name, bytes] of entries) {
@@ -217,13 +457,16 @@ export class CloudEngine {
       await writeFile(destination, bytes)
       if (name.startsWith('files/')) files.push(name.slice('files/'.length))
     }
-    const exitText = text('exit-code')?.trim()
-    const durationText = text('duration-seconds')?.trim()
-    await this.removeBranch(id).catch(() => undefined)
+    try {
+      await this.removeBranch(id)
+    } catch (_cleanupFailed) {
+      // The result is already written and the run remains authoritative.
+      console.warn(`Cloud task ${id} finished but its snapshot branch could not be removed`)
+    }
     return {
       job,
-      exitCode: exitText === undefined || exitText === '' ? null : Number(exitText),
-      durationSeconds: durationText === undefined || durationText === '' ? null : Number(durationText),
+      exitCode,
+      durationSeconds: duration,
       log: text('output.log') ?? '',
       directory: target,
       files: files.sort(),

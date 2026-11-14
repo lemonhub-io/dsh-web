@@ -62,7 +62,7 @@ jobs:
       - name: End-to-end tests
         env:
           DSH_E2E_CHROME: /usr/bin/google-chrome
-        run: pnpm exec vitest run --config vitest.web.config.ts apps/web/tests/pwa.e2e.ts apps/web/tests/web-platform.e2e.ts apps/web/tests/cordis-community.e2e.ts
+        run: pnpm exec vitest run --config vitest.web.config.ts apps/web/tests/pwa.e2e.ts apps/web/tests/web-platform.e2e.ts apps/web/tests/cordis-community.e2e.ts apps/web/tests/cloud-compute.e2e.ts
 
   publish:
     name: Publish to dsh.openhub.today

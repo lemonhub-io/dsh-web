@@ -37,10 +37,7 @@ function registerUi(ctx: Context): void {
       if (result !== undefined && !result.ok) throw new Error(result.error.message)
     },
     setup: async () => unwrap(await service.setup()),
-    start: async request => unwrap(await service.start(request)),
     jobs: async () => unwrap(await service.jobs()),
-    cancel: async id => unwrap(await service.cancel(id)),
-    collect: async (id, directory) => unwrap(await service.collect(id, directory)),
   }
   ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: NS, inject: () => face }, CloudPage))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 2, label: () => t('title'), locale: NS }, CloudPanelIcon))

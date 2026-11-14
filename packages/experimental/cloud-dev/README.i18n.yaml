@@ -3,23 +3,26 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/experimental/cloud-dev/README.md
 /:
-  en: b2e2aa8f7b0dfa73
-  zh: adc34773a57cf175
+  en: 2b30ae7b5ebda925
+  zh: 256a6161888b3d21
 /deepseek-ai-dsh-experimental-cloud-dev:
   en: c494f7e1aac38ce7
   zh: 577f6dcd544ca558
 /deepseek-ai-dsh-experimental-cloud-dev/summary:
-  en: 96a0724d2dbb104b
-  zh: ae13170d2fdd96e6
+  en: b0dbe07deaf39e1c
+  zh: 7ed72fb96d6965c9
 /deepseek-ai-dsh-experimental-cloud-dev/table-of-contents:
-  en: ca5dc537b0599b2a
-  zh: 53a505cafb4f4c08
+  en: 3460b3e585e0c020
+  zh: 85555dd6e2737989
 /deepseek-ai-dsh-experimental-cloud-dev/use-this-package:
-  en: 05d786b623ff4220
-  zh: 9152d51d2970ce8e
+  en: 1f8f72d6e038b327
+  zh: 142009a4d38f2c41
 /deepseek-ai-dsh-experimental-cloud-dev/understand-the-implementation:
-  en: 61d8149507bf35e2
-  zh: 1bec8d0f4afacb6f
+  en: 14a0d45a42395abd
+  zh: b735f970541542fa
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience:
+  en: 18765b5249adeb11
+  zh: 3e15646b9f4afc9f
 /deepseek-ai-dsh-experimental-cloud-dev/known-limitations-and-deferred-work:
-  en: e689a76eb50ca83f
-  zh: 3e782ca3bb54ec75
+  en: 09dccd03591e8f98
+  zh: 47ca14e0f0d82a4c

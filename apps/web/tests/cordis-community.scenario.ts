@@ -2,27 +2,8 @@
 import { randomUUID, createHash } from 'node:crypto'
 import type { BrowserContext, Page } from 'playwright'
 
-async function remote<T>(page: Page, method: string, args: object): Promise<T> {
-  return page.evaluate(
-    async ({ method, args, rpcId }) => {
-      const root = globalThis as typeof globalThis & {
-        __DSH_TRANSPORT__?: { fetch(input: string, init: RequestInit): Promise<Response> }
-      }
-      if (root.__DSH_TRANSPORT__ === undefined) throw new Error('Worker transport unavailable')
-      const response = await root.__DSH_TRANSPORT__.fetch('/api/' + method, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ type: 'client-request', rpcId, method, payload: { args } }),
-      })
-      const body = (await response.json()) as {
-        result: { ok: true; value: T } | { ok: false; error: { message: string } }
-      }
-      if (!body.result.ok) throw new Error(method + ' ' + body.result.error.message)
-      return body.result.value
-    },
-    { method, args, rpcId: randomUUID() },
-  )
-}
+import { workerRemote as remote } from './worker-rpc.ts'
+
 async function community(page: Page): Promise<void> {
   await page.locator('[data-composer-input]').first().waitFor({ timeout: 150000 })
   const notice = page.getByRole('button', { name: '继续', exact: true })

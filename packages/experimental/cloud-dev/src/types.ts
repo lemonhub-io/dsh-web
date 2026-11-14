@@ -19,7 +19,7 @@ export interface CloudDevStatus {
   gateway: 'unset' | 'ok' | 'unreachable'
   repository: 'unset' | 'ok' | 'missing' | 'unauthorized' | 'unknown'
   workflow: 'unknown' | 'installed' | 'missing'
-  /** Directory snapshotted by panel runs when none is given. */
+  /** Default directory for authenticated Remote requests AI tools use the Session directory. */
   defaultDirectory: string
   /** Credential reference holding the GitHub token. */
   tokenRef: string
@@ -36,13 +36,23 @@ export interface CloudJob {
   url: string | null
   createdAt: string
   updatedAt: string
+  /** Immutable snapshot commit used to recover the task's workspace and Session ownership. */
+  snapshotCommit?: string
 }
 
 /** A request to snapshot a directory and run a command on GitHub Actions. */
 export interface CloudRunRequest {
   /** Shell command run inside the snapshot. */
   command: string
-  /** Absolute directory to snapshot; the panel uses the default directory when omitted. */
+  /** Short description of the computing task shown in the conversation. */
+  description?: string
+  /** Dependency or environment preparation executed before the command. */
+  setup?: string
+  /** Node version installed by the runner Defaults to 24. */
+  nodeVersion?: string
+  /** Python version installed by the runner Defaults to 3.12. */
+  pythonVersion?: string
+  /** Absolute directory to snapshot Remote calls use the host default when omitted. */
   directory?: string
   /** Globs selecting files to upload, relative to the directory; everything when omitted. */
   include?: string[]
@@ -50,6 +60,12 @@ export interface CloudRunRequest {
   outputs?: string[]
   /** Working directory inside the snapshot. */
   workdir?: string
+}
+
+/** Immutable origin recorded with a cloud snapshot Tools enforce it before accessing results or cancelling work. */
+export interface CloudTaskOrigin {
+  directory: string
+  owner: string | null
 }
 
 /** What a finished job brought back into the workspace. */
