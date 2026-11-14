@@ -86,7 +86,7 @@ jobs:
           cd "$GITHUB_WORKSPACE/workspace/$DSH_WORKDIR"
           start=$(date +%s)
           set +e
-          bash -e -c 'if [ -n "$DSH_SETUP" ]; then bash -e -o pipefail -c "$DSH_SETUP"; fi; bash -e -o pipefail -c "$DSH_COMMAND"' 2>&1 | tee "$result/output.log"
+          bash -e -o pipefail -c "$DSH_SETUP"$'\\n'"$DSH_COMMAND" 2>&1 | tee "$result/output.log"
           code=\${PIPESTATUS[0]}
           set -e
           echo "$code" > "$result/exit-code"

@@ -1,16 +1,58 @@
 /** AI programming acceptance through the real Worker with a scripted model and optional live cloud runner. */
 import { randomUUID } from 'node:crypto'
+import { execFile } from 'node:child_process'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { delimiter, dirname, join } from 'node:path'
+import { promisify } from 'node:util'
+import { load } from 'js-yaml'
 import type { BrowserContext, Page, Route } from 'playwright'
-import { zipSync, strToU8 } from 'fflate'
+import { zipSync } from 'fflate'
 import { workerRemote as remote } from './worker-rpc.ts'
 
 const GATEWAY = 'https://dsh-gw.openhub.today'
 const BUILD = `import {execFileSync} from 'node:child_process';
 import {writeFileSync} from 'node:fs';
+if(process.env.DSH_CLOUD_SETUP!=='ready')throw new Error('Cloud setup environment was lost');
 const answer=Number(execFileSync(process.execPath,['-e','process.stdout.write(String(6*7))'],{encoding:'utf8'}));
 writeFileSync('report.json',JSON.stringify({answer,node:process.versions.node}));
 console.log('Native process computed',answer);
 `
+const SETUP = 'export DSH_CLOUD_SETUP=ready\nnode --version'
+
+/** Execute the installed workflow's task and output steps as the external runner fixture. */
+async function runFixture(workflow: string, command: string): Promise<Uint8Array> {
+  const document = load(workflow) as { jobs: { run: { steps: { name?: string; run?: string }[] } } }
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cloud-runner-'))
+  try {
+    await mkdir(join(root, 'workspace'))
+    await writeFile(join(root, 'workspace', 'build.mjs'), BUILD)
+    for (const name of ['Run command', 'Collect outputs']) {
+      const script = document.jobs.run.steps.find(step => step.name === name)?.run
+      if (script === undefined) throw new Error('Runner workflow step missing ' + name)
+      await promisify(execFile)('bash', ['-e', '-o', 'pipefail', '-c', script], {
+        cwd: root,
+        env: {
+          PATH: dirname(process.execPath) + delimiter + (process.env.PATH ?? ''),
+          GITHUB_WORKSPACE: root,
+          DSH_SETUP: SETUP,
+          DSH_COMMAND: command,
+          DSH_WORKDIR: '.',
+          DSH_OUTPUTS: 'report.json',
+        },
+        timeout: 30000,
+      })
+    }
+    const files: Record<string, Uint8Array> = {}
+    for (const path of ['output.log', 'exit-code', 'duration-seconds', 'files/report.json'])
+      files[path] = await readFile(join(root, '.dsh-cloud', path))
+    if (new TextDecoder().decode(files['exit-code']).trim() !== '0')
+      throw new Error('Cloud runner command failed')
+    return zipSync(files)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
 function modelResponse(model: string, call?: { name: string; args: object }): string {
   const events: string[] = []
   const emit = (type: string, data: object): void => {
@@ -68,6 +110,8 @@ export async function cloudComputeScenario(
   token?: string,
   capture?: (page: Page, name: string) => Promise<void>,
 ): Promise<{ jobId: string; report: string; checks: string[]; errors: string[] }> {
+  const expectedEnvironment = await readFile(new URL('./expected/cloud-compute/browser-environment.expected.md', import.meta.url), 'utf8')
+  const expectedGuidance = await readFile(new URL('./expected/cloud-compute/cloud-programming.expected.md', import.meta.url), 'utf8')
   const checks: string[] = [],
     errors: string[] = []
   const headers = {
@@ -81,6 +125,8 @@ export async function cloudComputeScenario(
     originRecord = '',
     dispatches = 0,
     runReads = 0
+  let fixtureResult: Uint8Array | undefined
+  let healthReads = 0
   let stage = 0,
     jobId = '',
     resultDirectory = '',
@@ -132,7 +178,7 @@ export async function cloudComputeScenario(
       }
       if (
         inputs.command !== 'node build.mjs' ||
-        inputs.setup !== 'node --version' ||
+        inputs.setup !== SETUP ||
         inputs.node_version !== '24' ||
         inputs.outputs !== 'report.json'
       )
@@ -140,12 +186,17 @@ export async function cloudComputeScenario(
       if (token !== undefined && !path.startsWith('repos/lemonhub-io/'))
         throw new Error('Live acceptance must only use lemonhub-io')
       run = { id: inputs.job, command: 'Validate native Node process', status: 'completed', conclusion: 'success' }
+      if (token === undefined) fixtureResult = await runFixture(workflow, inputs.command)
     }
     if (token !== undefined) {
       await route.continue()
       return
     }
     if (url.pathname === '/health') {
+      if (healthReads++ === 0) {
+        await json(route, 503, {})
+        return
+      }
       await json(route, 200, { service: 'dsh-cloud-gateway' })
       return
     }
@@ -244,13 +295,8 @@ export async function cloudComputeScenario(
       return
     }
     if (path.endsWith('/actions/artifacts/7/zip')) {
-      const zip = zipSync({
-        'output.log': strToU8('Native process computed 42'),
-        'exit-code': strToU8('0'),
-        'duration-seconds': strToU8('1'),
-        'files/report.json': strToU8('{"answer":42,"node":"24.fixture"}'),
-      })
-      await route.fulfill({ status: 200, headers, body: Buffer.from(zip) })
+      if (fixtureResult === undefined) throw new Error('Runner fixture did not produce an artifact')
+      await route.fulfill({ status: 200, headers, body: Buffer.from(fixtureResult) })
       return
     }
     throw new Error('Unimplemented cloud fixture endpoint ' + request.method() + ' ' + path)
@@ -269,30 +315,44 @@ export async function cloudComputeScenario(
     }
     const body = route.request().postDataJSON() as {
       model: string
-      system?: unknown
+      system?: string | { type: string; text?: string }[]
       tools?: { name: string }[]
       messages: unknown[]
     }
     const names = (body.tools ?? []).map(tool => tool.name),
       history = JSON.stringify(body.messages),
       last = JSON.stringify(body.messages.at(-1))
+    const lastMessage = body.messages.at(-1) as {
+      content?: { type: string; content?: { type: string; text?: string }[] }[]
+    }
+    const lastOutput = (lastMessage.content ?? []).flatMap(block => block.content ?? []).map(block => block.text ?? '').join('\n')
     let call: { name: string; args: object } | undefined
     if (names.includes('cloud_run') && history.includes('CLOUD-AI-COMPUTE')) {
-      if (!JSON.stringify(body.system).includes('Do not ask the user to type commands'))
-        throw new Error('Cloud programming guidance missing from model request')
+      const system = typeof body.system === 'string' ? body.system : (body.system ?? []).map(block => block.text ?? '').join('\n')
+      if (!history.includes(expectedEnvironment.trimEnd()) || !system.includes(expectedGuidance.trimEnd()))
+        throw new Error('Browser environment or cloud programming guidance differs from recorded text')
       if (stage === 0) {
-        call = { name: 'write', args: { file_path: 'build.mjs', content: BUILD } }
+        call = { name: 'cloud_status', args: {} }
         stage++
       } else if (stage === 1) {
-        call = { name: 'write', args: { file_path: '.env', content: 'DUMMY_SECRET=must-not-upload' } }
+        if (token === undefined && (!lastOutput.includes('"problem":"gateway"') || !lastOutput.includes('"status":"failed"')))
+          throw new Error('A transient cloud failure was classified as a connection problem')
+        call = { name: 'cloud_status', args: {} }
         stage++
       } else if (stage === 2) {
+        if (!lastOutput.includes('"status":"ready"')) throw new Error('Cloud readiness did not recover')
+        call = { name: 'write', args: { file_path: 'build.mjs', content: BUILD } }
+        stage++
+      } else if (stage === 3) {
+        call = { name: 'write', args: { file_path: '.env', content: 'DUMMY_SECRET=must-not-upload' } }
+        stage++
+      } else if (stage === 4) {
         call = {
           name: 'cloud_run',
           args: {
             description: 'Validate native Node process',
             command: 'node build.mjs',
-            setup: 'node --version',
+            setup: SETUP,
             node_version: '24',
             include: ['build.mjs', '.env'],
             outputs: ['report.json'],
@@ -301,11 +361,8 @@ export async function cloudComputeScenario(
         }
         stage++
       } else {
-        const message = body.messages.at(-1) as {
-          content?: { type: string; content?: { type: string; text?: string }[] }[]
-        }
         let value: { status?: string; jobId?: string; directory?: string; exitCode?: number } | undefined
-        for (const block of message.content ?? [])
+        for (const block of lastMessage.content ?? [])
           for (const text of block.content ?? []) {
             if (text.type === 'text' && text.text?.startsWith('{')) {
               try {
@@ -380,6 +437,9 @@ export async function cloudComputeScenario(
     if (!complete || dispatches !== 1 || originRecord === '')
       throw new Error('Cloud task was duplicated or lost its immutable origin')
     checks.push('The AI wrote code locally and selected cloud computing through logged tool calls')
+    checks.push('The assembled model request contains the recorded browser restrictions and complete cloud programming guidance')
+    checks.push('A transient cloud outage reports failed and recovers without requesting credentials or local execution')
+    checks.push('The installed runner workflow preserves setup exports through native task execution and output collection')
     checks.push('The private runner and workflow were prepared automatically without a manual setup action')
     checks.push('Setup commands toolchain versions and output selection reached one cloud dispatch')
     checks.push('Environment secrets were excluded and the immutable task origin was recorded')
