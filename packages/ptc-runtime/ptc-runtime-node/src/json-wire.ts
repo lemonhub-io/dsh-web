@@ -33,6 +33,9 @@ const intrinsicReflectOwnKeys = Reflect.ownKeys
 const intrinsicSetAdd = Reflect.get(Set.prototype, 'add') as IntrinsicCallable
 const intrinsicSetDelete = Reflect.get(Set.prototype, 'delete') as IntrinsicCallable
 const intrinsicSetHas = Reflect.get(Set.prototype, 'has') as IntrinsicCallable
+// Engines format native functions differently (WebKit and Gecko span lines), so compare with this engine's own text.
+const intrinsicArraySource = intrinsicReflectApply(intrinsicFunctionToString, Array, [])
+const intrinsicObjectSource = intrinsicReflectApply(intrinsicFunctionToString, Object, [])
 
 /** Build a data descriptor that cannot inherit model-defined accessor fields. */
 function dataDescriptor(value: unknown): PropertyDescriptor {
@@ -79,7 +82,7 @@ function setDelete<T>(target: Set<T>, value: T): void {
   intrinsicReflectApply(intrinsicSetDelete, target, [value])
 }
 
-/** Whether a realm-owned intrinsic prototype is backed by its native constructor. */
+/** Whether a realm-owned intrinsic prototype has a native constructor matching this engine's representation. */
 function hasIntrinsicConstructor(prototype: object, name: 'Array' | 'Object'): boolean {
   const descriptor = intrinsicObjectGetOwnPropertyDescriptor(prototype, 'constructor')
   const constructor: unknown = descriptor?.value
@@ -87,7 +90,7 @@ function hasIntrinsicConstructor(prototype: object, name: 'Array' | 'Object'): b
   try {
     return constructor.name === name
       && constructor.prototype === prototype
-      && intrinsicReflectApply(intrinsicFunctionToString, constructor, []) === `function ${name}() { [native code] }`
+      && intrinsicReflectApply(intrinsicFunctionToString, constructor, []) === (name === 'Array' ? intrinsicArraySource : intrinsicObjectSource)
   } catch {
     return false
   }

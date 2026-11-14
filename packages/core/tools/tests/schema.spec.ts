@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   JsonSchemaError,
   parameterSchemaSpecToJsonSchema,
@@ -201,5 +201,28 @@ describe('the unified author schema DSL', () => {
       symbol: { [symbolKey]: { type: 'string' } } satisfies ParameterSchemaSpec,
     }
     expect(Object.keys(invalidObjects)).toHaveLength(5)
+  })
+})
+
+describe('author schemas under WebKit and Gecko native function formatting', () => {
+  it('compiles tool parameters when native constructors print across lines', () => {
+    const originalToString = Reflect.get(Function.prototype, 'toString') as (this: unknown) => string
+    const toString = vi.spyOn(Function.prototype, 'toString').mockImplementation(function (this: unknown) {
+      if (this === Object) return 'function Object() {\n    [native code]\n}'
+      if (this === Array) return 'function Array() {\n    [native code]\n}'
+      return originalToString.call(this)
+    })
+    try {
+      expect(parameterSchemaSpecToJsonSchema({
+        path: { type: 'string', required: true },
+        mode: { type: 'string', enum: ['read', 'write'] },
+      })).toEqual({
+        type: 'object',
+        properties: { path: { type: 'string' }, mode: { type: 'string', enum: ['read', 'write'] } },
+        required: ['path'],
+      })
+    } finally {
+      toString.mockRestore()
+    }
   })
 })
