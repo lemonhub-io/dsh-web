@@ -22,7 +22,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-1. 部署网关：`CF_WORKERS_TOKEN=... pnpm --filter @deepseek-ai/dsh-experimental-cloud-dev run deploy:gateway`。令牌需要 Workers Scripts 编辑权限。设置 `DSH_GATEWAY_HOSTNAME` 可绑定自定义域名，`DSH_GATEWAY_ORIGINS` 列出允许调用它的 Web 来源。在 `gateway/` 下运行 `wrangler dev` 可在本地跑同一个 Worker。
+1. 部署网关：`CF_WORKERS_TOKEN=... pnpm --filter @deepseek-ai/dsh-experimental-cloud-dev run deploy:gateway`。令牌需要 Workers Scripts 编辑权限。设置 `DSH_GATEWAY_HOSTNAME` 可绑定自定义域名，`DSH_GATEWAY_ORIGINS` 列出允许调用它的 Web 来源。在 `gateway/` 下运行 `wrangler dev` 可在本地跑同一个 Worker。面板默认使用公共网关 `https://dsh-cloud-gateway.mzhub.workers.dev`，它接受 `https://dsh.daum.pw` 和 localhost 的请求。
 2. 新建一个私有运行仓库，默认分支上至少要有一次提交。
 3. 在面板中填写网关地址、`owner/name` 形式的仓库，以及带 `repo` 和 `workflow` 权限的 GitHub 令牌。令牌保存为 `DSH_CLOUD_GITHUB_TOKEN` 凭据，不写进设置文件。
 4. 选择**初始化运行仓库**，安装 `.github/workflows/dsh-cloud-run.yml`。
