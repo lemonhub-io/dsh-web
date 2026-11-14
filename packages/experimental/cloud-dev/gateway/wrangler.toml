@@ -1,0 +1,9 @@
+# DSH Cloud gateway. Deploy with `node --import tsx/esm gateway/deploy.ts` or `wrangler deploy`.
+name = "dsh-cloud-gateway"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+# Comma-separated browser origins allowed to read responses; localhost is allowed for development.
+ALLOWED_ORIGINS = "https://dsh.daum.pw"

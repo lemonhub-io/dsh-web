@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Cloud development",
+    "description": "Run workspace commands on GitHub Actions through a stateless Cloudflare Worker gateway and bring results back"
+  }
+}

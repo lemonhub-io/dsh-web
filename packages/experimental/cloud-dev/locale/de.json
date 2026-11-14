@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Cloud-Entwicklung",
+    "description": "Führt Befehle des Arbeitsbereichs über ein zustandsloses Cloudflare-Worker-Gateway auf GitHub Actions aus und holt die Ergebnisse zurück"
+  }
+}

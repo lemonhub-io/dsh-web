@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Desenvolvimento em nuvem",
+    "description": "Executa comandos do espaço de trabalho no GitHub Actions por meio de um gateway Cloudflare Worker sem estado e traz os resultados de volta"
+  }
+}

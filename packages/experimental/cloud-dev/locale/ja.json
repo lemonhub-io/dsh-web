@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "クラウドネイティブ開発",
+    "description": "ステートレスな Cloudflare Worker ゲートウェイ経由でワークスペースのコマンドを GitHub Actions で実行し結果を取り戻す"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Desarrollo en la nube",
+    "description": "Ejecuta comandos del espacio de trabajo en GitHub Actions a través de una pasarela Cloudflare Worker sin estado y recupera los resultados"
+  }
+}

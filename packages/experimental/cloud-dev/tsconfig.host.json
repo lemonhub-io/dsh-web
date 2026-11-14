@@ -1,0 +1,19 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "include": [
+    "src/*.ts"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../typert/protocol" },
+    { "path": "../../util/home-paths" },
+    { "path": "../../credentials/credentials" },
+    { "path": "../../core/tools" },
+    { "path": "../../session/working-directory" }
+  ]
+}

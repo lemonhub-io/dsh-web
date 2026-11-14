@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "云原生开发",
+    "description": "经由无状态 Cloudflare Worker 网关把工作区命令交给 GitHub Actions 运行并取回结果"
+  }
+}
