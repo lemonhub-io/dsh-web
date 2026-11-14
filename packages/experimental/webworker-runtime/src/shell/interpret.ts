@@ -23,6 +23,28 @@ const UNBOUNDED_COUNT = 1_000_000_000
 /** Ceiling for one run's time; the host's timeouts terminate the process worker first. */
 const UNBOUNDED_TIME_MS = 7 * 24 * 60 * 60 * 1000
 
+/** A missing-program line from the interpreter, including its browser-bundle variant. */
+const MISSING_PROGRAM = /^bash: ([^\s:]+): command not (?:found|available in browser environments\..*)$/gm
+
+/** Appended once when a line names a missing program, because a browser shell can never obtain one. */
+export const MISSING_PROGRAM_HINT =
+  'This browser shell provides only built-in file and text utilities; it cannot install or run other programs.\n'
+
+/**
+ * Restate missing-program lines in bash's own wording and add the browser limitation. The interpreter's browser
+ * variant suggests excluding the command or switching bundles, which no caller of this shell can do.
+ * @param stderr - The run's complete error output.
+ * @returns The rewritten error output.
+ */
+function explainMissingPrograms(stderr: string): string {
+  let missing = false
+  const text = stderr.replace(MISSING_PROGRAM, (_line, name: string) => {
+    missing = true
+    return `bash: ${name}: command not found`
+  })
+  return missing ? text + MISSING_PROGRAM_HINT : text
+}
+
 /**
  * The interpreter's defaults protect a host process from untrusted scripts. A run
  * here owns a dedicated Worker the host can terminate, so its counters must not
@@ -120,9 +142,10 @@ export async function runShellCommand(source: string, options: ShellRunOptions):
     return { exitCode: 1, stdout: '', stderr }
   }
   const stdout = textOf(result.stdout, result.stdoutKind === 'bytes')
+  const stderr = explainMissingPrograms(result.stderr)
   if (stdout !== '') options.onOutput?.('stdout', stdout)
-  if (result.stderr !== '') options.onOutput?.('stderr', result.stderr)
-  return { exitCode: isAborted(options.signal) ? ABORTED_STATUS : result.exitCode, stdout, stderr: result.stderr, env: result.env }
+  if (stderr !== '') options.onOutput?.('stderr', stderr)
+  return { exitCode: isAborted(options.signal) ? ABORTED_STATUS : result.exitCode, stdout, stderr, env: result.env }
 }
 
 /**

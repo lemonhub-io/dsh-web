@@ -72,7 +72,7 @@ export class CloudEngine {
     const account = await new GitHubClient(gateway, token, '').account(signal)
     if (account.missing.length > 0)
       throw new CloudDevError(
-        `The GitHub token lacks the ${account.missing.join(' and ')} scope Create a token with repo and workflow scopes`,
+        `The GitHub token lacks the ${account.missing.join(' and ')} scope. Ask the user to reconnect GitHub in Cloud development.`,
         403,
         'token-scopes',
       )
@@ -85,7 +85,7 @@ export class CloudEngine {
       if (!(error instanceof CloudDevError) || error.status !== 404) throw error
       if (!automatic)
         throw new CloudDevError(
-          `Runner repository ${choice} was not found or the token cannot access it`,
+          `Runner repository ${choice} was not found, or the token cannot access it.`,
           404,
           'runner-missing',
         )
@@ -102,14 +102,14 @@ export class CloudEngine {
         })
       } catch (error) {
         if (error instanceof CloudDevError && (error.status === 403 || error.status === 404))
-          throw new CloudDevError('The token cannot create the private runner repository', error.status, 'runner-denied')
+          throw new CloudDevError('The token cannot create the private runner repository.', error.status, 'runner-denied')
         if (!(error instanceof CloudDevError) || error.status !== 422) throw error
         repository = await engine.github.json(engine.github.repo(), { signal })
       }
     }
     if (automatic && repository.private !== true)
       throw new CloudDevError(
-        `${engine.repository} is public The automatic runner must be private Choose a private runner repository`,
+        `${engine.repository} is public, and the automatic runner must be private. Ask the user to choose a private runner repository in Cloud development.`,
         undefined,
         'runner-denied',
       )
@@ -156,7 +156,7 @@ export class CloudEngine {
     } catch (error) {
       if (error instanceof CloudDevError && (error.status === 403 || error.status === 404))
         throw new CloudDevError(
-          `The token cannot write the runner workflow in ${this.repository} Grant repo and workflow access`,
+          `The token cannot write the runner workflow in ${this.repository}. Ask the user to reconnect GitHub with repo and workflow access.`,
           error.status,
           'runner-denied',
         )
@@ -204,7 +204,7 @@ export class CloudEngine {
       if (size >= TREE_CHUNK_BYTES) await flush()
     }
     await flush()
-    if (tree === undefined) throw new CloudDevError('Snapshot tree was not created')
+    if (tree === undefined) throw new CloudDevError('The workspace snapshot was not created.')
     return tree
   }
 
@@ -219,16 +219,16 @@ export class CloudEngine {
     signal?: AbortSignal,
   ): Promise<CloudStartedJob> {
     const command = request.command.trim()
-    if (command === '') throw new CloudDevError('Enter a command')
-    if (command.length > 20000) throw new CloudDevError('The command is too long')
-    if ((request.setup?.length ?? 0) > 20000) throw new CloudDevError('The setup command is too long')
+    if (command === '') throw new CloudDevError('The command is empty.')
+    if (command.length > 20000) throw new CloudDevError('The command exceeds 20000 characters.')
+    if ((request.setup?.length ?? 0) > 20000) throw new CloudDevError('The setup script exceeds 20000 characters.')
     for (const version of [request.nodeVersion, request.pythonVersion]) {
       if (version !== undefined && !/^[\w.+^~<>=| -]{1,80}$/.test(version))
-        throw new CloudDevError('Invalid toolchain version')
+        throw new CloudDevError('Use a version number or range, such as 22 or 3.12.')
     }
     const workdir = request.workdir ?? '.'
     if (isAbsolute(workdir) || workdir.split(/[\\/]/).includes('..'))
-      throw new CloudDevError('The cloud working directory must stay inside the snapshot')
+      throw new CloudDevError('workdir must be a relative directory inside the snapshot.')
     const files = await snapshot(request.directory, request.include ?? [], signal, [resolveDshHome()])
     const id = newJobId()
     const branch = await this.defaultBranch(signal)
@@ -279,13 +279,13 @@ export class CloudEngine {
     } catch (error) {
       if (!(error instanceof CloudDevError) || error.status === undefined) {
         throw new CloudDevError(
-          `Dispatch outcome is unknown for job ${id} Check cloud_job before starting another task`,
+          `Job ${id} may have started. Check it with cloud_job before starting another task.`,
         )
       }
       await this.removeBranch(id)
       if (error.status === 404)
         throw new CloudDevError(
-          'The runner workflow is not available yet Retry the task after GitHub finishes registering it',
+          'GitHub has not registered the runner workflow yet. Retry the task in a minute.',
           404,
         )
       throw error
@@ -331,7 +331,7 @@ export class CloudEngine {
   }
 
   private jobId(id: string): string {
-    if (!/^[a-z0-9]+-[a-z0-9-]+$/.test(id)) throw new CloudDevError('Invalid cloud job id')
+    if (!/^[a-z0-9]+-[a-z0-9-]+$/.test(id)) throw new CloudDevError('This is not a cloud job id.')
     return id
   }
 
@@ -363,7 +363,7 @@ export class CloudEngine {
       value.owner !== owner ||
       value.directory !== directory
     ) {
-      throw new CloudDevError('This cloud task belongs to another Session or workspace', 403)
+      throw new CloudDevError('This job belongs to another Session or workspace.', 403)
     }
     return { directory: value.directory, owner }
   }
@@ -394,7 +394,7 @@ export class CloudEngine {
       job = await this.job(id, signal)
     }
     if (job.runId === null)
-      throw new CloudDevError(`Cancellation is unconfirmed for job ${id} Check cloud_job before rerunning`, 409)
+      throw new CloudDevError(`Cancellation of job ${id} is unconfirmed. Check it with cloud_job before rerunning.`, 409)
     if (job.status !== 'completed') {
       await this.github.json(this.github.repo(`/actions/runs/${job.runId}/cancel`), {
         method: 'POST',
@@ -418,7 +418,7 @@ export class CloudEngine {
    */
   async collect(id: string, directory: string, signal?: AbortSignal): Promise<CloudJobResult> {
     const job = await this.job(id, signal)
-    if (job.status !== 'completed' || job.runId === null) throw new CloudDevError(`Job ${id} has not finished`, 409)
+    if (job.status !== 'completed' || job.runId === null) throw new CloudDevError(`Job ${id} has not finished.`, 409)
     const artifacts = await this.github.json<{ artifacts: { id: number; name: string; expired: boolean }[] }>(
       this.github.repo(`/actions/runs/${job.runId}/artifacts`),
       { ...(signal ? { signal } : {}) },
@@ -434,7 +434,7 @@ export class CloudEngine {
         job,
         exitCode: null,
         durationSeconds: null,
-        log: 'The runner failed before producing task artifacts Inspect these workflow logs\n' + log,
+        log: 'The runner failed before the task produced results. Workflow logs follow.\n' + log,
         directory: target,
         files: [],
       }
@@ -454,7 +454,7 @@ export class CloudEngine {
       (exitCode !== null && (!Number.isInteger(exitCode) || exitCode < 0 || exitCode > 255)) ||
       (duration !== null && (!Number.isFinite(duration) || duration < 0))
     ) {
-      throw new CloudDevError('The cloud result metadata is invalid The task outcome cannot be trusted')
+      throw new CloudDevError('The job result metadata is invalid, so the outcome is unknown.')
     }
     const files: string[] = []
     for (const [name, bytes] of entries) {

@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { MemoryVfs } from '@deepseek-ai/dsh-experimental-webworker-runtime/src/storage/memory.ts'
 import { setActiveVfs } from '@deepseek-ai/dsh-experimental-webworker-runtime/src/storage/active.ts'
-import { isShellCommand, runShellCommand, runShellProgram } from '@deepseek-ai/dsh-experimental-webworker-runtime/src/shell/interpret.ts'
+import { isShellCommand, MISSING_PROGRAM_HINT, runShellCommand, runShellProgram } from '@deepseek-ai/dsh-experimental-webworker-runtime/src/shell/interpret.ts'
 import { hostFileSystem } from '@deepseek-ai/dsh-experimental-webworker-runtime/src/shell/fs-access.ts'
 import { landlockFileSystem } from '@deepseek-ai/dsh-experimental-webworker-runtime/src/shell/process/landlock.ts'
 
@@ -51,6 +51,12 @@ describe('bash grammar and commands', () => {
   it('passes program arguments verbatim', async () => {
     const result = await runShellProgram(['printf', '%s', 'it\'s $HOME'], { cwd: WORKSPACE, env: {} })
     expect(result.stdout).toBe('it\'s $HOME')
+  })
+
+  it('names missing programs in bash wording and states once that the browser shell cannot run them', async () => {
+    const result = await run('npm install; python3 -c 1')
+    expect(result.exitCode).toBe(127)
+    expect(result.stderr).toBe(`bash: npm: command not found\nbash: python3: command not found\n${MISSING_PROGRAM_HINT}`)
   })
 
   it('reports which programs can start without a shell line', () => {

@@ -33,6 +33,8 @@ export const IMAGE_HOME_DIRECTORY = 'home'
  * logs stay plaintext.
  */
 export const PLATFORM_ENTRY_CONFIG: Readonly<Record<string, Readonly<Record<string, unknown>>>> = {
+  // The browser shell runs no programs, so cloud development tells the model to run all code in the cloud.
+  'cloud-dev': { workspace: 'browser' },
   'session-persistence-jsonl': { compression: 'none' },
   'ui-settings-account': { loginEnabled: false },
   // A Worker has no operating system to ask for a Documents folder, and every workspace belongs in durable storage.

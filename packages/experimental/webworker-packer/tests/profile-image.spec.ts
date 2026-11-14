@@ -53,6 +53,10 @@ describe('platform home patch', () => {
     })
   })
 
+  it('puts cloud development in browser mode, where the shell runs no programs', () => {
+    expect(platformHomePatch(repoRoot, 'web')).toContainEqual({ id: 'cloud-dev', config: { workspace: 'browser' } })
+  })
+
   it('disables rows that need a Node Host and removes PTC rows from every preset', () => {
     const patch = platformHomePatch(repoRoot, 'web')
     expect(patch).toContainEqual({ id: 'open-in-app', disabled: true })

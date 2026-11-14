@@ -15,6 +15,6 @@ description: "云原生开发任务改由 AI 工具控制 并要求会话来源�
 
 ## 迁移
 
-浏览器内的智能体在本地完成文件操作 所有安装、编译、检查及计算均通过云端工具执行。将依赖与工具链准备放入 `cloud_run.setup` 导出的变量和 PATH 变更会在单次全新任务内保留至任务执行。`cloud_status` 返回 `problem` 代码 并将暂时性服务故障报告为 `failed`。
+`cloud-dev` 条目新增的 `workspace` 配置默认为 `local` 保留宿主 shell；DSH Web 镜像设为 `browser` 此时智能体在本地完成文件操作 所有安装、编译、检查及计算均通过云端工具执行。将依赖与工具链准备放入 `cloud_run.setup` 导出的变量和 PATH 变更会在单次全新任务内保留至任务执行。`cloud_status` 返回 `problem` 代码 并将暂时性服务故障报告为 `failed`。
 
 保留已有 GitHub 凭据和运行仓库。已保存的网关地址或工作流名称会被忽略 自定义网关请在 cordis.yml 的 `cloud-dev` 条目下设置 `gatewayUrl`。集成以 `{ token?, repository }` 调用 `connect` 取代先 `configure` 后 `setup`。在对话中要求 AI 执行计算任务。运行仓库留空时自动准备账号所属私有仓库。没有会话来源记录的既有任务仍可在 GitHub 查看 在工作会话中新建任务即可自动取回结果。显式认证 Remote 集成保留原有方法。

@@ -110,8 +110,8 @@ export async function cloudComputeScenario(
   token?: string,
   capture?: (page: Page, name: string) => Promise<void>,
 ): Promise<{ jobId: string; report: string; checks: string[]; errors: string[] }> {
-  const expectedEnvironment = await readFile(new URL('./expected/cloud-compute/browser-environment.expected.md', import.meta.url), 'utf8')
-  const expectedGuidance = await readFile(new URL('./expected/cloud-compute/cloud-programming.expected.md', import.meta.url), 'utf8')
+  const expectedEnvironment = await readFile(new URL('../../../packages/experimental/cloud-dev/tests/expected/browser-environment.expected.md', import.meta.url), 'utf8')
+  const expectedGuidance = await readFile(new URL('../../../packages/experimental/cloud-dev/tests/expected/browser-guidance.expected.md', import.meta.url), 'utf8')
   const checks: string[] = [],
     errors: string[] = []
   const headers = {

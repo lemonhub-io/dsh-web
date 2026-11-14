@@ -16,7 +16,7 @@ it('keeps application storage and private environment files out of a selected wo
     await writeFile(join(root, 'build.mjs'), 'console.log(42)')
     const files = await snapshot(root, ['**'], undefined, [home])
     expect(files.map(file => file.path)).toEqual(['.env.example', 'build.mjs'])
-    await expect(snapshot(home, [], undefined, [home])).rejects.toThrow('cannot upload application storage')
+    await expect(snapshot(home, [], undefined, [home])).rejects.toThrow('is application storage and cannot be uploaded')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

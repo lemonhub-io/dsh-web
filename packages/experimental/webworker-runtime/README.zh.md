@@ -73,7 +73,7 @@ kind: "package-library"
 - **懒加载提供的文件在其归档到达前不能同步读取**：使用方必须先异步读取一次；Host 的按需 Client chunk 路由就是这样做的。
 - **文件 watcher 只能观察已挂载的 VFS**：镜像 seed 不产生事件，VFS 也没有符号链接或外部写入方。`persistent`、`ref()` 和 `unref()` 保留 Node API，但浏览器没有引用计数事件循环，因此这些接口不能控制 dedicated Worker 的生存期。
 - **Worker confinement 是 VFS 边界，不是内核 Landlock**：`read-only` 和 `workspace-write` 运行未经修改的 `@deepseek-ai/node-addon-system/landlock-run` JavaScript 与 launcher argv，进程层则实现逻辑 `landlock-run` 可执行文件，并在 shell 的每次文件系统请求上执行其授权。`full` 仅覆盖 Worker 命令表和已挂载 VFS，不表示能够执行任意 native 进程，也不表示 Linux 内核隔离。
-- **这个 shell 是 bash 解释器，不是 bash**：`just-bash` 提供语法和命令表，Worker 另外基于 isomorphic-git 提供 `git`。没有 `node`、`python` 或包管理器。智能体脚本运行的 Worker 与本源同源，运行任意 JavaScript 就能读到已保存的凭据和文件夹句柄，VFS 隔离也随之失效，所以不提供这类命令。输出在命令行结束时才返回，后台任务运行期间看不到输出。重定向中的文件系统拒绝会结束整行，而 bash 会继续执行下一条命令。
+- **这个 shell 是 bash 解释器，不是 bash**：`just-bash` 提供语法和命令表，Worker 另外基于 isomorphic-git 提供 `git`。没有 `node`、`python` 或包管理器；命令行用到不存在的程序时报告 `command not found` 并追加一行说明这个 shell 不能安装或运行其他程序 镜像还把云原生开发的 `workspace` 设为 `browser` 让模型在云端运行程序。智能体脚本运行的 Worker 与本源同源，运行任意 JavaScript 就能读到已保存的凭据和文件夹句柄，VFS 隔离也随之失效，所以不提供这类命令。输出在命令行结束时才返回，后台任务运行期间看不到输出。重定向中的文件系统拒绝会结束整行，而 bash 会继续执行下一条命令。
 - **`git` 只覆盖常用命令**：`init clone status add rm commit log diff branch checkout switch reset merge tag rev-parse config remote fetch pull push`。访问拒绝浏览器请求的托管站时，网络命令需要设置 `GIT_CORS_PROXY`；认证需要 `GIT_TOKEN`。`curl` 和 `web_fetch` 工具同样受 CORS 限制，大多数网站会拒绝它们。
 - **shell 进程没有同步文件面**：它靠消息读写宿主的 VFS。遍历目录的命令每个条目都要一次往返，两条并发命令的写入可能交错。
 - **页面打开期间持久数据都在内存中**：平台层在启动时把 `home/` 和 `workspace/` 读入 VFS，并在约 100 毫秒内写回变更，因此内存占用随数据量增长，标签页崩溃可能丢失最后的写入。

@@ -15,14 +15,59 @@
   en: 3460b3e585e0c020
   zh: 85555dd6e2737989
 /deepseek-ai-dsh-experimental-cloud-dev/use-this-package:
-  en: 91634ae03fce7c05
-  zh: 0874cbc05de8e6dd
+  en: 88f57f57ff48ec7f
+  zh: ea227547428cb608
 /deepseek-ai-dsh-experimental-cloud-dev/understand-the-implementation:
-  en: 27f98c8f3e7ec450
-  zh: d0fad0cf9d6dd378
+  en: 7519589166c2f103
+  zh: 4dd3c5436d9d0318
 /deepseek-ai-dsh-experimental-cloud-dev/model-experience:
-  en: 780cded35c7bc8ff
-  zh: c8b9a251c6b9d138
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/browser-environment-context:
+  en: 6bc600dc53f169d0
+  zh: cefdaad6fc31e85e
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/browser-environment-context/what-the-model-sees:
+  en: 96cef264eadda693
+  zh: 3ea07ccb4fb76721
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/browser-environment-context/what-the-model-sees/browser-environment:
+  en: 5a49a7a3766b8653
+  zh: 1ed10f5ffbe6f35d
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/browser-environment-context/token-effect:
+  en: 799a6a87e9f63df2
+  zh: 980538465de33b47
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/browser-environment-context/kv-cache-effect:
+  en: 544bacc2dff01fea
+  zh: ee2466c01223dfa8
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/cloud-execution-section:
+  en: 8d453e085f5061e4
+  zh: 0ee9cbbd04f2b006
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/cloud-execution-section/what-the-model-sees:
+  en: 34719c119351db85
+  zh: 780159f96b8df504
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/cloud-execution-section/what-the-model-sees/browser-guidance:
+  en: 447707eaa4bb11f2
+  zh: ae7bd756a404edc9
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/cloud-execution-section/what-the-model-sees/local-guidance:
+  en: 054e5cd7b4a3fee7
+  zh: 23be164b80f0f869
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/cloud-execution-section/token-effect:
+  en: 04243d732e831948
+  zh: 72500fdb9e51427d
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/cloud-execution-section/kv-cache-effect:
+  en: 22046d0f47df2b7e
+  zh: 69a64a42b9d87ff7
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/cloud-tools:
+  en: fa98da3bc3a0942c
+  zh: 338d1624b34362e5
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/cloud-tools/what-the-model-sees:
+  en: 0a93d81d1b4d953e
+  zh: e0a4efdeb4515904
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/cloud-tools/token-effect:
+  en: 4dee8cfc8d8f1856
+  zh: fea79e6fddb00e39
+/deepseek-ai-dsh-experimental-cloud-dev/model-experience/cloud-tools/kv-cache-effect:
+  en: 230eebd699e3fb85
+  zh: 31729f38f05e2643
 /deepseek-ai-dsh-experimental-cloud-dev/known-limitations-and-deferred-work:
-  en: 09dccd03591e8f98
-  zh: 47ca14e0f0d82a4c
+  en: 289fc8e8cdd536f3
+  zh: e316a6ab8e6215a5

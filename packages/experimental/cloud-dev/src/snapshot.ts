@@ -48,7 +48,7 @@ export async function snapshot(
 ): Promise<SnapshotFile[]> {
   const excluded = new Set(excludedRoots.map(path => resolve(path)))
   if (excluded.has(resolve(root)))
-    throw new Error('Choose a project directory Cloud tasks cannot upload application storage')
+    throw new Error('The workspace is application storage and cannot be uploaded. Use a project directory.')
   const match = include.length === 0 ? undefined : picomatch([...include], { dot: true })
   const files: SnapshotFile[] = []
   let total = 0
@@ -73,13 +73,13 @@ export async function snapshot(
       if (match !== undefined && !match(path)) continue
       const info = await stat(absolute)
       if (info.size > SNAPSHOT_LIMITS.fileBytes)
-        throw new Error(`${path} is larger than ${SNAPSHOT_LIMITS.fileBytes / 1048576} MiB`)
+        throw new Error(`${path} is larger than ${SNAPSHOT_LIMITS.fileBytes / 1048576} MiB. Leave it out with include globs.`)
       total += info.size
       if (files.length >= SNAPSHOT_LIMITS.files)
-        throw new Error(`The snapshot has more than ${SNAPSHOT_LIMITS.files} files Narrow it with include globs`)
+        throw new Error(`The snapshot has more than ${SNAPSHOT_LIMITS.files} files. Narrow it with include globs.`)
       if (total > SNAPSHOT_LIMITS.bytes)
         throw new Error(
-          `The snapshot is larger than ${SNAPSHOT_LIMITS.bytes / 1048576} MiB Narrow it with include globs`,
+          `The snapshot is larger than ${SNAPSHOT_LIMITS.bytes / 1048576} MiB. Narrow it with include globs.`,
         )
       const bytes = new Uint8Array(await readFile(absolute))
       let text: string | undefined

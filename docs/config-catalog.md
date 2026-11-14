@@ -1087,7 +1087,7 @@ export interface Config {
 
 - `inject`: `typert` · `credentials` · `tools` · `workingDirectory` · `systemPrompt`
 - `refs`: `z` (`zod`)
-- `source`: [`packages/experimental/cloud-dev/src/index.ts:55`](../packages/experimental/cloud-dev/src/index.ts)
+- `source`: [`packages/experimental/cloud-dev/src/index.ts:62`](../packages/experimental/cloud-dev/src/index.ts)
 
 ```ts config-catalog
 /** Validated deployment configuration after schema defaults. */
