@@ -224,6 +224,12 @@
 
     # ── browser plugin roster (dsh.client rows; node halves are layer-2 hosts) ──
 
+    # Safari and other engines without Symbol.dispose / Symbol.asyncDispose
+    # get both before the first page script; client bundles key dispose
+    # methods with them when they evaluate.
+    - id: dispose-shim
+      name: '@deepseek-ai/dsh-host-dispose-shim'
+
     # Dual-face: the node half scans this tree, composes window.__DSH_BOOT__,
     # and serves /plugins/<id>/client.js; the browser half is the module table
     # the shell kernel constructs before cordis exists (adopted as a plugin

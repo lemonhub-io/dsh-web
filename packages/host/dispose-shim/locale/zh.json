@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "显式资源管理兼容层",
+    "description": "为 Safari 等缺少 Symbol.dispose 和 Symbol.asyncDispose 的浏览器在页面脚本运行前补齐这两个符号"
+  }
+}

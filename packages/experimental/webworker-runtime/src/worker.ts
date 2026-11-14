@@ -10,6 +10,8 @@
  * Messages before `init` queue here; requests during boot queue inside the
  * host, which attaches its handler before its first await.
  */
+// First, so every bundled and image module evaluates with the explicit resource management symbols.
+import './polyfill/dispose-symbols.ts'
 // Straight to the assembly, not through the package barrel: the barrel also
 // publishes the pack-time transform, whose acorn dependency would then be bundled
 // into this worker — which never parses JavaScript.

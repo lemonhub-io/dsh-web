@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "明示的リソース管理の互換レイヤー",
+    "description": "Safari など Symbol.dispose と Symbol.asyncDispose を持たないブラウザで ページのスクリプトより先にこの 2 つのシンボルを定義します"
+  }
+}

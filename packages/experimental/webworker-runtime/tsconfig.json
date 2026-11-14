@@ -34,6 +34,9 @@
       "path": "../../client/file-upload/tsconfig.host.json"
     },
     {
+      "path": "../../host/dispose-shim"
+    },
+    {
       "path": "../../host/webserver"
     },
     {

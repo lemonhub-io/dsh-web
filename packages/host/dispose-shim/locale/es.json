@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Compatibilidad con la gestión explícita de recursos",
+    "description": "Añade Symbol.dispose y Symbol.asyncDispose a Safari y otros navegadores que no los tienen antes de que se ejecute cualquier script de la página"
+  }
+}

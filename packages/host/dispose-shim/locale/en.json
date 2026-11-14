@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Explicit resource management shim",
+    "description": "Adds Symbol.dispose and Symbol.asyncDispose to Safari and other browsers that lack them before any page script runs"
+  }
+}

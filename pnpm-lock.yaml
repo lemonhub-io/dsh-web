@@ -3227,6 +3227,9 @@ importers:
       '@deepseek-ai/dsh-host-directory-picker-native':
         specifier: workspace:*
         version: link:../../host/directory-picker-native
+      '@deepseek-ai/dsh-host-dispose-shim':
+        specifier: workspace:*
+        version: link:../../host/dispose-shim
       '@deepseek-ai/dsh-host-frontend-static':
         specifier: workspace:*
         version: link:../../host/frontend-static
@@ -11693,6 +11696,9 @@ importers:
       '@deepseek-ai/dsh-client-web':
         specifier: workspace:*
         version: link:../../client/web
+      '@deepseek-ai/dsh-host-dispose-shim':
+        specifier: workspace:*
+        version: link:../../host/dispose-shim
       '@deepseek-ai/dsh-util-crypto':
         specifier: workspace:*
         version: link:../../util/crypto
@@ -12678,6 +12684,15 @@ importers:
       tsx:
         specifier: ^4.23.13
         version: 4.23.13
+
+  packages/host/dispose-shim:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-host-webserver':
+        specifier: workspace:*
+        version: link:../webserver
 
   packages/host/frontend-static:
     dependencies:

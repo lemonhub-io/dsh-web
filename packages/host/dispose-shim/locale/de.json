@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Kompatibilität für explizite Ressourcenverwaltung",
+    "description": "Ergänzt Symbol.dispose und Symbol.asyncDispose in Safari und anderen Browsern ohne diese Symbole vor jedem Skript der Seite"
+  }
+}
