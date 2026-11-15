@@ -50,8 +50,7 @@ export async function cordisCommunityScenario(
     'access-control-allow-methods': '*',
   }
   const repositoryName = 'dsh-tests/ordinary-plugin'
-  const commitSha = '1'.repeat(40),
-    treeSha = '2'.repeat(40)
+  const commitSha = '1'.repeat(40)
   const blobs = Object.entries(sourceFiles).map(([path, bytes]) => ({
     path,
     bytes,
@@ -77,28 +76,24 @@ export async function cordisCommunityScenario(
           { full_name: repositoryName, description: 'Ordinary Cordis plugin from GitHub', default_branch: 'main' },
         ],
       }
-    } else if (url.pathname === '/repos/' + repositoryName + '/commits/main') {
-      body = { sha: commitSha, commit: { tree: { sha: treeSha } } }
-    } else if (url.pathname === '/repos/' + repositoryName + '/git/trees/' + treeSha) {
+    } else if (url.pathname === '/repos/' + repositoryName + '/packages' && url.searchParams.get('ref') === 'main') {
       body = {
-        truncated: false,
-        tree: blobs.map(file => ({
-          path: file.path,
-          sha: file.sha,
-          type: 'blob',
-          mode: '100644',
-          size: file.bytes.length,
-        })),
+        commit: commitSha,
+        files: blobs.map(file => ({ path: file.path, sha: file.sha, mode: '100644', size: file.bytes.length })),
+        manifests: blobs
+          .filter(file => file.path === 'package.json')
+          .map(file => ({ path: file.path, data: Buffer.from(file.bytes).toString('base64') })),
       }
-    } else if (url.pathname.startsWith('/repos/' + repositoryName + '/git/blobs/')) {
-      const file = blobs.find(item => url.pathname.endsWith('/' + item.sha))
-      if (file === undefined) throw new Error('Unpinned Git blob request ' + url.pathname)
-      if (route.request().headers().accept !== 'application/vnd.github.raw+json')
-        throw new Error('Git blob was not requested as raw bytes')
+    } else if (url.pathname === '/repos/' + repositoryName + '/blobs') {
+      const parts = (url.searchParams.get('sha') ?? '').split(',').map((sha) => {
+        const file = blobs.find(item => item.sha === sha)
+        if (file === undefined) throw new Error('Unpinned Git blob request ' + sha)
+        return Buffer.from(file.bytes)
+      })
       await route.fulfill({
         status: 200,
         headers: { ...cors, 'content-type': 'application/octet-stream' },
-        body: Buffer.from(file.bytes),
+        body: Buffer.concat(parts),
       })
       return
     } else {

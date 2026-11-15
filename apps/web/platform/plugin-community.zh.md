@@ -16,9 +16,9 @@ Cordis 插件拥有与内置插件相同的浏览器宿主权限，包括工作�
 
 将已构建插件 JavaScript、package.json、Cordis 补丁和必要资源提交到公开仓库。声明 `dsh.bundle.patch` 并添加 `dsh-plugin` 主题即可被发现。单仓库可包含多个组合包 目录直链将发现范围限定到该子目录。存在 npm `files` 列表时按其选择发行文件。Git 子模块和符号链接不能提供包内容。不支持私有仓库与 GitHub 登录。
 
-浏览器直接读取 GitHub 搜索、提交、递归树及原始 blob REST 端点 无需代理或 GitHub 令牌。搜索每页加载 50 个仓库并提供加载更多，显示匹配总数，最多可达 GitHub 返回的前 1000 个结果；检查最多读取 24 个包清单。截断或过大的树会被拒绝。文件按四个一批传输 并遵守当前宿主归档限制。搜索限时 15 秒 仓库检查 60 秒 完整包传输 120 秒。触发额度限制时保留已有结果并提示稍后重试。
+从发现到下载 浏览器都不直接访问 GitHub，所有 GitHub 读取由社区后端完成。搜索每页加载 50 个仓库并提供加载更多，显示匹配总数，最多可达 GitHub 返回的前 1000 个结果。打开仓库只需一次后端请求，返回固定提交、文件列表和最多 24 个包清单。截断或过大的树会被拒绝。安装时每次后端请求下载最多 24 个 Git blob，同时进行两个请求，逐个按 blob 标识校验文件，并遵守当前宿主归档限制。搜索限时 15 秒 仓库检查 60 秒 完整包传输 120 秒。触发额度限制时保留已有结果并提示稍后重试。
 
-安装不使用 GitHub release 下载链接 因为资源宿主未提供此流程需要的浏览器跨域访问。检查时 Worker 使用现有模块转换器处理已构建 JavaScript 而不执行代码。TypeScript 仍需作者构建 外部依赖必须捆绑或由宿主提供。
+位于 `github.com` release 下载、`raw.githubusercontent.com` 和 GitHub release 资源主机上的目录与插件包链接通过后端获取，因此可以按链接安装 GitHub release 资源。检查时 Worker 使用现有模块转换器处理已构建 JavaScript 而不执行代码。TypeScript 仍需作者构建 外部依赖必须捆绑或由宿主提供。
 
 ## 准备普通组合包
 
@@ -36,14 +36,14 @@ node --import tsx/esm scripts/pack-web-plugin.ts --src apps/web/plugin-examples/
 
 使用既有[市场索引格式 1](../../../packages/util/plugin-market-index/README.zh.md)。每个版本保留普通 npm 或固定 Git 提交的 `source`，并可增加 `web: { "url": "hello-1.0.0.tgz", "sha256": "<lowercase SHA-256>" }`。Web 地址相对索引地址解析，除同源开发外必须使用 HTTPS。原生客户端保留原安装来源。[内置索引](../public/plugin-community/cordis/index.json)提供可用 Web 示例，并非已填充的第三方目录。
 
-请求不带凭据且拒绝重定向。社区将索引限制为 512 KiB 与 100 个包，下载期限为 15 秒。检查实际包前，发行版元数据仅供参考。SHA-256 建立与所选索引的一致性，不代表发布者身份。浏览器内不安装 npm 依赖解析器或编译器。
+请求不带凭据且拒绝重定向；托管在 GitHub 上的链接经由后端获取，后端只在 GitHub 文件主机之间跟随重定向。社区将索引限制为 512 KiB 与 100 个包，下载期限为 15 秒。检查实际包前，发行版元数据仅供参考。SHA-256 建立与所选索引的一致性，不代表发布者身份。浏览器内不安装 npm 依赖解析器或编译器。
 
 <a id="community-backend"></a>
 ## 社区后端
 
-GitHub 发现与源码下载通过独立 Worker `https://dsh-community.openhub.today` 完成。`ui-plugin-manager` 条目支持通过 `communityBackendUrl` 选择其他 HTTPS 后端。Worker 提供只读的公开仓库搜索、元数据、提交、树和 blob 接口 在获取仓库数据前检查仓库可见性 并将搜索结果过滤为公开仓库。仓库响应仅包含发现展示的字段：名称、简介、默认分支、星标数、最近推送时间、主题和 SPDX 许可证。搜索接受 `sort=updated` 或 `sort=stars`。浏览器继续执行提交固定、blob 哈希验证和包检查。
+GitHub 发现与源码下载通过独立 Worker `https://dsh-community.openhub.today` 完成。`ui-plugin-manager` 条目支持通过 `communityBackendUrl` 选择其他 HTTPS 后端。Worker 提供只读的公开仓库搜索与元数据、包含固定提交、文件列表和包清单的 `packages` 快照、每批最多 24 个已校验 Git blob 的 `blobs` 批量下载，以及公开 GitHub 文件主机的 `fetch` 代理。每个 GitHub 请求在网络失败或服务器错误后重试一次。Worker 在获取仓库数据前检查仓库可见性 并将搜索结果过滤为公开仓库。仓库响应仅包含发现展示的字段：名称、简介、默认分支、星标数、最近推送时间、主题和 SPDX 许可证。搜索接受 `sort=updated` 或 `sort=stars`。浏览器继续执行提交固定、blob 哈希验证和包检查。
 
-可选的 `GITHUB_TOKEN` secret 在 Worker 内认证上游请求。允许的浏览器来源通过 `ALLOWED_ORIGINS` 配置 默认允许本机开发。可变结果缓存 60 秒 不可变树和 blob 缓存一小时 `CACHE_SECONDS`、`IMMUTABLE_CACHE_SECONDS` 与 `MAX_RESPONSE_BYTES` 配置这些限制。上游额度限制响应会进入社区已有的错误提示。
+可选的 `GITHUB_TOKEN` secret 在 Worker 内认证上游请求。允许的浏览器来源通过 `ALLOWED_ORIGINS` 配置 默认允许本机开发。可变结果缓存 60 秒，固定提交的结果缓存一小时。缓存副本保留七天，在 GitHub 失败或限流时以 `x-dsh-stale` 标记返回。`CACHE_SECONDS`、`IMMUTABLE_CACHE_SECONDS`、`STALE_SECONDS` 与 `MAX_RESPONSE_BYTES` 配置这些限制。上游额度限制响应会进入社区已有的错误提示。
 
 在仓库外的受保护文件中准备 Cloudflare 凭据、账号及区域标识和 GitHub 凭据后 从仓库根目录部署。部署会更新 Worker secret 并绑定自定义域名 已有绑定指向其他 Worker 时停止部署。
 

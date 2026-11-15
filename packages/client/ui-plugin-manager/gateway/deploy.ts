@@ -28,6 +28,7 @@ const bindings: object[] = [
   { type: 'plain_text', name: 'ALLOWED_ORIGINS', text: process.env.DSH_COMMUNITY_ORIGINS ?? 'https://dsh.openhub.today' },
   { type: 'plain_text', name: 'CACHE_SECONDS', text: '60' },
   { type: 'plain_text', name: 'IMMUTABLE_CACHE_SECONDS', text: '3600' },
+  { type: 'plain_text', name: 'STALE_SECONDS', text: '604800' },
   { type: 'plain_text', name: 'MAX_RESPONSE_BYTES', text: '33554432' },
 ]
 if (process.env.GITHUB_TOKEN) bindings.push({ type: 'secret_text', name: 'GITHUB_TOKEN', text: process.env.GITHUB_TOKEN })

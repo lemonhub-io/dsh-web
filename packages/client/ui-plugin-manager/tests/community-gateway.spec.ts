@@ -1,4 +1,5 @@
 /** The server credential only reads public allowlisted repository data. */
+import { createHash } from 'node:crypto'
 import { expect, it, vi } from 'vitest'
 import worker from '../gateway/worker.js'
 
@@ -52,5 +53,71 @@ it('authenticates public package reads and refuses a private repository before r
     expect(seen.length).toBe(before + 1)
   } finally {
     upstream.mockRestore()
+  }
+})
+
+it('serves a repository snapshot and verified blob batches, proxies GitHub file hosts and falls back to its last good copy', async () => {
+  const sha1 = (text: string): string => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
+  const manifest = '{"name":"plugin","dsh":{"bundle":{}}}'
+  const code = 'export const apply = () => {}'
+  const commit = '1'.repeat(40), tree = '2'.repeat(40)
+  let outage = false, flaky = 1
+  const seen: { url: string; authorization: string | null }[] = []
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (address, init) => {
+    const url = address instanceof Request ? address.url : address instanceof URL ? address.href : address
+    seen.push({ url, authorization: new Headers(init?.headers).get('authorization') })
+    if (outage) return new Response(null, { status: 503 })
+    if (url.endsWith('/repos/owner/public')) return Response.json({ private: false, full_name: 'owner/public', default_branch: 'main' })
+    if (url.endsWith('/commits/main')) return Response.json({ sha: commit, commit: { tree: { sha: tree } } })
+    if (url.includes(`/git/trees/${tree}`)) return Response.json({ truncated: false, tree: [
+      { type: 'blob', path: 'plugin/package.json', sha: sha1(manifest), size: manifest.length, mode: '100644' },
+      { type: 'blob', path: 'plugin/index.js', sha: sha1(code), size: code.length, mode: '100644' },
+      { type: 'blob', path: 'other/readme.md', sha: '3'.repeat(40), size: 1, mode: '100644' },
+    ] })
+    if (url.endsWith('/git/blobs/' + sha1(manifest))) return new Response(manifest)
+    if (url.endsWith('/git/blobs/' + sha1(code))) {
+      flaky -= 1
+      return flaky >= 0 ? new Response(null, { status: 502 }) : new Response(code)
+    }
+    if (url === 'https://github.com/owner/public/releases/download/v1/plugin.tgz')
+      return new Response(null, { status: 302, headers: { location: 'https://release-assets.githubusercontent.com/asset' } })
+    if (url === 'https://release-assets.githubusercontent.com/asset') return new Response('archive')
+    return new Response(null, { status: 404 })
+  })
+  const store = new Map<string, Response>()
+  vi.stubGlobal('caches', { default: {
+    match: async (key: Request) => store.get(key.url)?.clone(),
+    put: async (key: Request, value: Response) => { store.set(key.url, value) },
+  } })
+  const pending: Promise<unknown>[] = []
+  const env = { GITHUB_TOKEN: 'fixture-server-secret', CACHE_SECONDS: '1' }
+  const context = { waitUntil: (operation: Promise<unknown>): void => { pending.push(operation) } }
+  const get = (path: string) => worker.fetch(new Request('https://dsh-community.openhub.today/' + path), env, context)
+  try {
+    const snapshot = await (await get('github/repos/owner/public/packages?ref=main&directory=plugin')).json() as {
+      commit: string
+      files: { path: string }[]
+      manifests: { path: string; data: string }[]
+    }
+    expect(snapshot.commit).toBe(commit)
+    expect(snapshot.files.map(file => file.path)).toEqual(['plugin/package.json', 'plugin/index.js'])
+    expect(snapshot.manifests).toEqual([{ path: 'plugin/package.json', data: Buffer.from(manifest).toString('base64') }])
+    const batch = await get(`github/repos/owner/public/blobs?sha=${sha1(manifest)},${sha1(code)}`)
+    expect(await batch.text()).toBe(manifest + code)
+    expect((await get('github/repos/owner/public/blobs?sha=' + 'a'.repeat(40) + ',' + 'a'.repeat(40))).status).toBe(400)
+    const file = await get('fetch?url=' + encodeURIComponent('https://github.com/owner/public/releases/download/v1/plugin.tgz'))
+    expect(await file.text()).toBe('archive')
+    expect(seen.filter(item => !item.url.startsWith('https://api.github.com/')).every(item => item.authorization === null)).toBe(true)
+    expect((await get('fetch?url=' + encodeURIComponent('https://example.com/plugin.tgz'))).status).toBe(403)
+    await Promise.all(pending)
+    outage = true
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10000)
+    const stale = await get('github/repos/owner/public/packages?ref=main&directory=plugin')
+    expect(stale.headers.get('x-dsh-stale')).toBe('1')
+    expect((await stale.json() as { commit: string }).commit).toBe(commit)
+    expect((await get('github/repos/owner/public/packages?ref=other')).status).toBe(503)
+  } finally {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   }
 })

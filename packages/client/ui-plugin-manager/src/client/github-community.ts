@@ -141,13 +141,13 @@ export async function discoverGitHub(request: GitHubQuery, signal: AbortSignal, 
   return { repositories, total, direct: false }
 }
 
-async function blob(backend: string, repo: string, file: GitHubFile, signal: AbortSignal): Promise<Uint8Array> {
-  const bytes = await downloadCommunityBytes(
-    backend.replace(/\/+$/, '') + `/github/repos/${repo}/git/blobs/${file.sha}`,
-    file.size,
-    signal,
-    'application/vnd.github.raw+json',
-  )
+/** Blob identities the backend downloads in one request. */
+const BLOB_BATCH = 24
+/** Blob batch requests in flight at once. */
+const BLOB_REQUESTS = 2
+
+/** Refuse bytes whose Git blob identity differs from the pinned tree entry. */
+async function verify(bytes: Uint8Array, file: GitHubFile): Promise<Uint8Array> {
   const prefix = new TextEncoder().encode(`blob ${bytes.length}\0`)
   const payload = new Uint8Array(prefix.length + bytes.length)
   payload.set(prefix)
@@ -158,25 +158,36 @@ async function blob(backend: string, repo: string, file: GitHubFile, signal: Abo
   }
   return bytes
 }
+function decodeBase64(value: string): Uint8Array {
+  let binary: string
+  try {
+    binary = atob(value)
+  } catch (_invalidBase64) {
+    throw new CommunitySourceError('invalid')
+  }
+  return Uint8Array.from(binary, char => char.charCodeAt(0))
+}
 
 /** Read package manifests from a single commit without evaluating repository code.
+ * One backend request returns the pinned commit, its file list under the selected directory and the manifests.
  * @param repo Repository selected by discovery.
  * @param signal Caller-owned cancellation and deadline.
  * @param backend Worker backend URL.
  * @returns Ordinary bundle packages with npm files selection and pinned blob identities.
  */
 export async function githubPackages(repo: GitHubRepository, signal: AbortSignal, backend: string): Promise<GitHubPackage[]> {
-  const commit = object(await json(backend, `repos/${repo.name}/commits/${encodeURIComponent(repo.branch)}`, signal))
-  const sha = text(commit.sha)
-  if (!/^[a-f0-9]{40}$/.test(sha)) throw new CommunitySourceError('invalid')
-  const treeId = text(object(object(commit.commit).tree).sha)
-  if (!/^[a-f0-9]{40}$/.test(treeId)) throw new CommunitySourceError('invalid')
-  const tree = object(await json(backend, `repos/${repo.name}/git/trees/${treeId}?recursive=1`, signal, 4 * 1024 * 1024))
-  if (tree.truncated !== false || !Array.isArray(tree.tree)) throw new CommunitySourceError('size')
-  const files: GitHubFile[] = []
-  for (const raw of tree.tree) {
+  const query = new URLSearchParams({ ref: repo.branch, ...(repo.directory === '' ? {} : { directory: repo.directory }) })
+  const snapshot = object(await json(backend, `repos/${repo.name}/packages?${query.toString()}`, signal, 16 * 1024 * 1024))
+  const sha = text(snapshot.commit)
+  if (!/^[a-f0-9]{40}$/.test(sha) || !Array.isArray(snapshot.files) || !Array.isArray(snapshot.manifests))
+    throw new CommunitySourceError('invalid')
+  const supplied = new Map(snapshot.manifests.map((raw) => {
     const entry = object(raw)
-    if (entry.type !== 'blob') continue
+    return [text(entry.path), text(entry.data)] as const
+  }))
+  const files: GitHubFile[] = []
+  for (const raw of snapshot.files) {
+    const entry = object(raw)
     const path = text(entry.path),
       hash = text(entry.sha),
       mode = text(entry.mode)
@@ -202,7 +213,9 @@ export async function githubPackages(repo: GitHubRepository, signal: AbortSignal
   for (const file of manifests) {
     if (file.size > 256 * 1024 || (file.mode !== '100644' && file.mode !== '100755'))
       throw new CommunitySourceError('invalid')
-    const bytes = await blob(backend, repo.name, file, signal)
+    const data = supplied.get(file.path)
+    if (data === undefined) throw new CommunitySourceError('invalid')
+    const bytes = await verify(decodeBase64(data), file)
     let raw: unknown
     try {
       raw = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
@@ -247,7 +260,7 @@ export async function githubPackages(repo: GitHubRepository, signal: AbortSignal
   return packages
 }
 
-/** Fetch pinned blobs and assemble a bounded npm archive for download or ordinary inspection.
+/** Fetch pinned blobs in backend batches and assemble a bounded npm archive for download or ordinary inspection.
  * @param pkg Package selected from one repository commit.
  * @param limits Current host archive policy.
  * @param signal Caller-owned cancellation and deadline.
@@ -262,24 +275,35 @@ export async function downloadGitHubPackage(
 ): Promise<Uint8Array> {
   const tarSize = 1024 + pkg.files.reduce((sum, file) => sum + 512 + Math.ceil(file.size / 512) * 512, 0)
   if (pkg.files.length > limits.files || tarSize > limits.expandedBytes) throw new CommunitySourceError('size')
-  const entries: {
-    header: { name: string; size: number }
-    body: Uint8Array
-  }[] = []
-  for (let index = 0; index < pkg.files.length; index += 4) {
-    const batch = pkg.files.slice(index, index + 4)
-    const results = await Promise.allSettled(
-      batch.map(async file => ({
-        header: { name: 'package/' + file.path, size: file.size },
-        body: await blob(backend, pkg.repository, file, signal),
-      })),
+  // Identical files share one blob, so each identity is downloaded once.
+  const unique = [...new Map(pkg.files.map(file => [file.sha, file])).values()]
+  const batches: GitHubFile[][] = []
+  for (let index = 0; index < unique.length; index += BLOB_BATCH) batches.push(unique.slice(index, index + BLOB_BATCH))
+  const contents = new Map<string, Uint8Array>()
+  const fetchBatch = async (batch: GitHubFile[]): Promise<void> => {
+    const total = batch.reduce((sum, file) => sum + file.size, 0)
+    const bytes = await downloadCommunityBytes(
+      backend.replace(/\/+$/, '') + `/github/repos/${pkg.repository}/blobs?sha=${batch.map(file => file.sha).join(',')}`,
+      total,
+      signal,
     )
-    for (const result of results) {
-      if (result.status === 'rejected') throw result.reason
-      entries.push(result.value)
+    if (bytes.length !== total) throw new CommunitySourceError('invalid')
+    let offset = 0
+    for (const file of batch) {
+      contents.set(file.sha, await verify(bytes.subarray(offset, offset + file.size), file))
+      offset += file.size
     }
   }
+  for (let index = 0; index < batches.length; index += BLOB_REQUESTS) {
+    const results = await Promise.allSettled(batches.slice(index, index + BLOB_REQUESTS).map(fetchBatch))
+    for (const result of results) if (result.status === 'rejected') throw result.reason
+  }
   signal.throwIfAborted()
+  const entries = pkg.files.map((file) => {
+    const body = contents.get(file.sha)
+    if (body === undefined) throw new CommunitySourceError('invalid')
+    return { header: { name: 'package/' + file.path, size: file.size }, body }
+  })
   const tar = await packTar(entries)
   const gzip = new Blob([new Uint8Array(tar)]).stream().pipeThrough(new CompressionStream('gzip'))
   const bytes = new Uint8Array(await new Response(gzip).arrayBuffer())

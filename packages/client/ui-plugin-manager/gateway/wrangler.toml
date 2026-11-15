@@ -8,4 +8,5 @@ routes = [{ pattern = "dsh-community.openhub.today", custom_domain = true }]
 ALLOWED_ORIGINS = "https://dsh.openhub.today"
 CACHE_SECONDS = "60"
 IMMUTABLE_CACHE_SECONDS = "3600"
+STALE_SECONDS = "604800"
 MAX_RESPONSE_BYTES = "33554432"

@@ -6,6 +6,25 @@ export class CommunitySourceError extends Error {
   }
 }
 
+/** GitHub hosts whose files reach the browser only through the community backend. */
+const GITHUB_FILE_HOSTS = new Set(['github.com', 'raw.githubusercontent.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'])
+
+/** Route a GitHub-hosted catalog or package URL through the community backend; other addresses are unchanged.
+ * @param address Absolute source or same-origin development reference.
+ * @param backend Community backend URL.
+ * @returns The backend file address for GitHub hosts, otherwise `address`.
+ */
+export function communitySource(address: string, backend: string): string {
+  let url: URL
+  try {
+    url = new URL(address, location.href)
+  } catch (_invalidAddress) {
+    return address
+  }
+  if (url.protocol !== 'https:' || !GITHUB_FILE_HOSTS.has(url.hostname.toLowerCase())) return address
+  return `${backend.replace(/\/+$/, '')}/fetch?url=${encodeURIComponent(url.href)}`
+}
+
 /** Read an HTTPS source without redirects or ambient credentials.
  * @param address Absolute source or same-origin development reference.
  * @param limit Maximum response bytes.

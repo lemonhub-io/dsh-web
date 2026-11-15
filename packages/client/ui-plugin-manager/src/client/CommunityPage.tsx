@@ -12,7 +12,7 @@ import type { BundleInfo, ChangeResult, WebBundleInspection, WebPackageLimits } 
 import { parseMarketIndex } from '@deepseek-ai/dsh-plugin-market-index'
 import { bytesToBase64 } from '@deepseek-ai/dsh-util-crypto'
 import css from './CommunityPage.module.css'
-import { CommunitySourceError, downloadCommunityBytes as download } from './community-download.ts'
+import { CommunitySourceError, communitySource, downloadCommunityBytes as download } from './community-download.ts'
 import { age, byteSize, compactCount } from './community-format.ts'
 import type { communityZh } from './community-locales.ts'
 import {
@@ -285,7 +285,7 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
     void work('listing:' + listing.name, async () => {
       if (limits == null) return
       const link = httpsLink(listing.url)
-      await review(await download(listing.url, limits.archiveBytes, deadline(SEARCH_MS)), listing, {
+      await review(await download(communitySource(listing.url, props.backendUrl), limits.archiveBytes, deadline(TRANSFER_MS)), listing, {
         label: listing.url,
         ...(link === undefined ? {} : { link }),
       })
@@ -593,7 +593,7 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
                 onSubmit={(event) => {
                   event.preventDefault()
                   void work('catalog', async () => {
-                    const bytes = await download(catalogUrl, 512 * 1024, deadline(SEARCH_MS))
+                    const bytes = await download(communitySource(catalogUrl, props.backendUrl), 512 * 1024, deadline(SEARCH_MS))
                     setListings(catalog(JSON.parse(new TextDecoder().decode(bytes)), new URL(catalogUrl, location.href).href))
                   })
                 }}
@@ -611,7 +611,8 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
                   void work('url', async () => {
                     if (limits == null) return
                     const link = httpsLink(packageUrl)
-                    await review(await download(packageUrl, limits.archiveBytes, deadline(SEARCH_MS)), undefined, {
+                    const bytes = await download(communitySource(packageUrl, props.backendUrl), limits.archiveBytes, deadline(TRANSFER_MS))
+                    await review(bytes, undefined, {
                       label: packageUrl,
                       ...(link === undefined ? {} : { link }),
                     })
