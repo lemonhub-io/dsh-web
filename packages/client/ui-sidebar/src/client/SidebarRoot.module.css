@@ -284,11 +284,15 @@
   min-width: 0;
 }
 
+/* The mark takes the accent ink with a soft glow of the same hue; the
+   wordmark stays in the primary ink beside it. */
 .brandMark {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--dsw-alias-accent);
+  filter: drop-shadow(0 2px 6px var(--dsw-alias-accent-glow));
 }
 
 .brandName {
@@ -297,10 +301,11 @@
   gap: 6px;
   min-width: 0;
   height: 24px;
+  font-family: var(--dsw-font-family-brand);
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 24px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 
 .fallbackBrandName {
@@ -416,8 +421,12 @@
 }
 
 /* New Session: 38px bar, 12px radius (figma 133:7634 geometry, squared-off
-   corners); collapsed it renders as the rail's plain icon control. */
+   corners); collapsed it renders as the rail's plain icon control. The bar is
+   the sidebar's one accent call to action: a faint accent wash over the
+   panel ground inside a 1px brand-gradient rim (the rim is the border box
+   showing through the transparent border), lifting into a glow on hover. */
 .newSession {
+  --dsh-new-session-fill: color-mix(in srgb, var(--dsw-alias-accent) 6%, var(--dsw-alias-bg-base));
   container-type: inline-size;
   position: relative;
   flex: none;
@@ -429,21 +438,35 @@
   padding: 8px 12px;
   margin: 0 calc(var(--dsh-sidebar-paint-inset) + 1px);
   box-sizing: border-box;
-  border: 0.5px solid var(--dsw-alias-border-l3);
+  border: 1px solid transparent;
   border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-button-elevated-fill);
+  background:
+    linear-gradient(var(--dsh-new-session-fill), var(--dsh-new-session-fill)) padding-box,
+    var(--dsw-gradient-brand) border-box;
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
   font-weight: 500;
   line-height: 22px;
   cursor: pointer;
   overflow: hidden;
+  transition:
+    box-shadow var(--ds-transition-duration) var(--ds-ease-in-out),
+    transform var(--ds-transition-duration) var(--ds-ease-in-out);
+}
+
+.newSessionContent > svg {
+  color: var(--dsw-alias-accent);
 }
 
 @media (hover: hover) {
   .newSession:hover {
-    background: var(--dsw-alias-button-floating-hover);
+    --dsh-new-session-fill: color-mix(in srgb, var(--dsw-alias-accent) 12%, var(--dsw-alias-bg-base));
+    box-shadow: 0 6px 18px -6px var(--dsw-alias-accent-glow);
   }
+}
+
+.newSession:active {
+  transform: translateY(0.5px) scale(0.995);
 }
 
 /* macOS: the themed elevated fill reads as a foreign slab on the vibrancy
@@ -478,6 +501,7 @@
   gap: 0;
   border-color: transparent;
   background: transparent;
+  box-shadow: none;
 }
 
 @media (hover: hover) {
@@ -634,9 +658,17 @@
   background: transparent;
 }
 
-.panelEntryActive,
 .panelEntry:has(:focus-visible) {
   background-color: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* The open panel's entry carries the accent wash with an accent glyph. */
+.panelEntryActive {
+  background-color: var(--dsw-alias-accent-soft);
+}
+
+.panelEntryActive .panelGlyph {
+  color: var(--dsw-alias-accent);
 }
 
 .panelUnpin {

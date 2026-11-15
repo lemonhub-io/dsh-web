@@ -42,7 +42,8 @@ export class AppWebEntry {
 
   /**
    * Load and activate every client entry, audit activation, then hand the
-   * mount point to the UI renderer. A required-entry failure remains visible
+   * mount point to the UI renderer and dissolve the boot page into the
+   * mounted application. A required-entry failure remains visible
    * on the boot page; optional-entry failures are reported to the console and
    * the application mounts without them.
    * @param onFailure - Optional carrier-owned fatal presentation; keeps the boot page visible.
@@ -99,6 +100,7 @@ export class AppWebEntry {
       // renderer draws is the one the first frame measures.
       this.stopDragRecall = installWindowDragRecall({ document: this.container.ownerDocument })
       await mountClient(ctx, this.container)
+      this.page.handoff()
     } catch (reason) {
       console.error(reason)
       if (onFailure !== undefined) onFailure(reason)

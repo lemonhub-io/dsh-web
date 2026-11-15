@@ -37,3 +37,8 @@ body {
 [data-dsh-automatic-focus]:focus:focus-visible {
   outline: none;
 }
+
+/* Text selection takes a translucent accent wash in both themes. */
+::selection {
+  background: color-mix(in srgb, var(--dsw-alias-accent, rgb(57, 100, 254)) 24%, transparent);
+}

@@ -82,6 +82,73 @@
   min-height: 0;
 }
 
+/* Browser build (no desktop platform mark), side-by-side layout: the frame
+   and sidebar share the canvas and the centre column floats on it as one
+   rounded, elevated panel, inset from the window edges. A docked right track
+   turns the panel back into a flush split so the occupant's own left border
+   joins the centre edge to edge; the drawer layout stays full-bleed. Margin,
+   radius and shadow ride the track curve while data-animating is up. */
+:global(html:not([data-platform])) .frame:not([data-sidebar-drawer]) {
+  --dsh-frame-panel-inset: 8px;
+  background: var(--dsw-alias-canvas);
+}
+
+:global(html:not([data-platform])) .frame:not([data-sidebar-drawer]) .sidebarCol {
+  border-right: none;
+}
+
+:global(html:not([data-platform])) .frame:not([data-sidebar-drawer]) .centerCol {
+  margin: var(--dsh-frame-panel-inset) var(--dsh-frame-panel-inset) var(--dsh-frame-panel-inset) 0;
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-base);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
+  box-shadow: var(--dsw-elevation-panel);
+}
+
+:global(html:not([data-platform])) .frame:not([data-sidebar-drawer]):not([data-rightbar-collapsed]) .centerCol {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: inset 0.5px 0 0 var(--dsw-alias-border-l3);
+}
+
+:global(html:not([data-platform])) .frame[data-animating] .centerCol {
+  transition:
+    margin var(--ds-transition-duration-slow) var(--ds-ease-in-out),
+    border-radius var(--ds-transition-duration-slow) var(--ds-ease-in-out),
+    box-shadow var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+/* First paint after the boot handoff: the panel rises into place while the
+   sidebar content fades in beside it. */
+:global(html:not([data-platform])) .frame:not([data-sidebar-drawer]) .centerCol {
+  animation: frame-panel-in 640ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.sidebarCol > * {
+  animation: frame-sidebar-in 520ms cubic-bezier(0.22, 1, 0.36, 1) 80ms backwards;
+}
+
+@keyframes frame-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+@keyframes frame-sidebar-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global(html:not([data-platform])) .frame:not([data-sidebar-drawer]) .centerCol,
+  .sidebarCol > * {
+    animation: none;
+  }
+}
+
 /* macOS desktop: the frame goes transparent so window vibrancy reaches the
    sidebar column, which keeps only a translucent tint; the centre paints the
    base background itself to stay opaque. The sidebar/centre separator moves

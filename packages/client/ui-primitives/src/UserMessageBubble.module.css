@@ -1,6 +1,9 @@
 .bubble {
   max-width: 100%;
-  background: var(--dsw-specific-bubble);
+  /* The bubble fill with a faint cyan sheen toward the trailing corner. */
+  background:
+    linear-gradient(135deg, transparent 30%, color-mix(in srgb, var(--dsw-static-abyss-cyan) 9%, transparent)),
+    var(--dsw-specific-bubble);
   border-radius: var(--dsw-radius-xl);
   padding: 10px 16px;
   font-size: var(--dsh-content-font-size, 14px);

@@ -67,7 +67,7 @@ describe('bootstrap failure rendering', () => {
     expect(failure).toHaveBeenCalledWith(new Error('web boot: window.__ModuleLoader__ bootstrap facade is missing'))
     expect(container.textContent).toContain('Loading plugins')
     expect(container.textContent).not.toContain('Failed to load plugins')
-    expect(container.querySelector('[data-dsh-boot-spinner]')).not.toBeNull()
+    expect(container.querySelector('[data-dsh-boot-progress]')).not.toBeNull()
     await entry.dispose()
   })
 
@@ -92,7 +92,7 @@ describe('bootstrap failure rendering', () => {
       if (carrier) {
         expect(report).toHaveBeenCalledOnce()
         expect(String(report.mock.calls[0]![0])).toContain(`${REQUIRED_ID} (required): failed: Error: plugin activation failed`)
-        expect(container.querySelector('[data-dsh-boot-spinner]')).not.toBeNull()
+        expect(container.querySelector('[data-dsh-boot-progress]')).not.toBeNull()
         expect(container.textContent).not.toContain('Failed to load plugins')
       } else {
         expect(report).not.toHaveBeenCalled()
@@ -318,8 +318,8 @@ it('draws the shared boot page before Host injections and resumes without replac
   const boot = entry.run()
   try {
     const page = container.querySelector('[data-dsh-boot]')
-    const spinner = container.querySelector('[data-dsh-boot-spinner]')
-    expect(spinner).not.toBeNull()
+    const progress = container.querySelector('[data-dsh-boot-progress]')
+    expect(progress).not.toBeNull()
     await Promise.resolve()
     expect(create).not.toHaveBeenCalled()
     expect(error).not.toHaveBeenCalled()

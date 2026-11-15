@@ -65,7 +65,7 @@ describe('elevation tokens', () => {
       .flatMap(rule => rule.declarations)
       .findLast(([property]) => property === token)?.[1]
     expect(value('body')).toBe('rgba(252, 253, 254, 0.7)')
-    expect(value('body[data-ds-dark-theme]')).toBe('rgba(48, 49, 54, 0.64)')
+    expect(value('body[data-ds-dark-theme]')).toBe('rgba(30, 35, 48, 0.72)')
     expect(value('body', '--dsw-specific-menu')).toBe('var(--dsw-menu-surface-fill)')
     expect(value("html[data-platform='darwin'] body", '--dsw-specific-menu')).toBe('rgba(248, 249, 250, 0.94)')
     expect(value("html[data-platform='darwin'] body[data-ds-dark-theme]", '--dsw-specific-menu')).toBe('rgba(48, 49, 54, 0.94)')

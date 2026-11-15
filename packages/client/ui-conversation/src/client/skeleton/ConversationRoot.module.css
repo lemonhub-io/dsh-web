@@ -14,6 +14,63 @@
   isolation: isolate;
 }
 
+/* Home atmosphere, below every frame layer and all content (same stacking
+   contract as the frame decorations). ::before is a slow aurora: three
+   accent-hued radial washes on one oversized layer that drifts and turns on
+   the compositor. ::after is a faint dot lattice faded out from the centre.
+   Both are decorative, take no pointer events, and hold still under reduced
+   motion. */
+.root[data-phase='hero']::before,
+.root[data-phase='hero']::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.root[data-phase='hero']::before {
+  inset: -12%;
+  background:
+    radial-gradient(38% 32% at 34% 40%, var(--dsw-alias-aurora-a), transparent 72%),
+    radial-gradient(32% 28% at 68% 44%, var(--dsw-alias-aurora-b), transparent 72%),
+    radial-gradient(44% 36% at 52% 68%, var(--dsw-alias-aurora-c), transparent 74%);
+  animation: hero-aurora 26s ease-in-out infinite alternate, hero-atmosphere-in 1200ms ease-out backwards;
+}
+
+.root[data-phase='hero']::after {
+  inset: 0;
+  background-image: radial-gradient(circle, var(--dsw-alias-border-l3) 0.8px, transparent 1.3px);
+  background-size: 24px 24px;
+  background-position: center;
+  mask-image: radial-gradient(ellipse 52% 46% at 50% 46%, #000 10%, transparent 78%);
+  animation: hero-atmosphere-in 1600ms ease-out backwards;
+}
+
+@keyframes hero-aurora {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  50% { transform: translate3d(2.5%, -2%, 0) rotate(7deg) scale(1.06); }
+  100% { transform: translate3d(-2%, 1.5%, 0) rotate(-5deg) scale(1.02); }
+}
+
+@keyframes hero-atmosphere-in {
+  from { opacity: 0; }
+}
+
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-phase='hero']::before,
+  .root[data-phase='hero']::after,
+  .heroWorkspaceRow {
+    animation: none;
+  }
+}
+
 /* 76px with its rule: the height of the Sidebar's tab strip and header row
    (ui-dockkit `.tabStrip` 38px + the pane header's 38px), so the two rules
    meet at the column edge. The rows add up to it — 10px top inset, the 30px
@@ -293,7 +350,8 @@
 }
 
 .tabActive::after {
-  background: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-gradient-brand);
+  box-shadow: 0 1px 6px var(--dsw-alias-accent-glow);
 }
 
 /* The More launcher centers its 22px box on the tab's 16px text line. */
@@ -615,6 +673,7 @@
      closer to the card's inner controls below; right keeps the trailing
      preset seat off the card edge. */
   padding: 0 16px 0 20px;
+  animation: hero-rise 720ms cubic-bezier(0.22, 1, 0.36, 1) 90ms backwards;
 }
 
 /* Plugin options share the row, pushed to its right edge. */

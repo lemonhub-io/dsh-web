@@ -21,8 +21,9 @@
   }
 }
 
+/* The selected Session takes the accent wash, like the open panel entry. */
 .sessionRow.selected {
-  background-color: var(--dsw-alias-interactive-bg-hover);
+  background-color: var(--dsw-alias-accent-soft);
 }
 
 .dragPreview {

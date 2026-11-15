@@ -40,8 +40,17 @@ body * {
 }
 
 body[data-ds-dark-theme] {
-  --dsw-linear-gradient-think: linear-gradient(180deg, #151517 20.19%, rgba(21, 21, 23, 0) 100%);
-  --dsw-linear-think-select: linear-gradient(180deg, #232325 20.19%, rgba(35, 35, 37, 0) 100%);
+  --dsw-linear-gradient-think: linear-gradient(180deg, #0d1017 20.19%, rgba(13, 16, 23, 0) 100%);
+  --dsw-linear-think-select: linear-gradient(180deg, #13171f 20.19%, rgba(19, 23, 31, 0) 100%);
+  --dsw-gradient-brand-ink: linear-gradient(100deg, #f9fafb 8%, #b4cbff 52%, #6dccff 100%);
+}
+
+/* Brand gradients. `brand` fills accent controls and marks; `brand-ink`
+   paints display text (clipped to glyphs) from the primary ink into the
+   accent, so the start of a headline keeps full text contrast. */
+body {
+  --dsw-gradient-brand: linear-gradient(120deg, var(--dsw-static-abyss-blue) 0%, var(--dsw-static-abyss-azure) 55%, var(--dsw-static-abyss-cyan) 100%);
+  --dsw-gradient-brand-ink: linear-gradient(100deg, #0f1115 8%, #2b4fe0 58%, #398efe 100%);
 }
 
 /* ---------- 字体 ---------- */
