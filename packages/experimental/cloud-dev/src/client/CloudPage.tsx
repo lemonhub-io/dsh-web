@@ -7,13 +7,14 @@ import {
   IconWarningOutlineRegular,
   Input,
   StateDot,
+  Switch,
   Tag,
   relativeTime,
   type StateDotState,
   type TagTone,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { CloudConnectRequest, CloudDevProblem, CloudDevStatus, CloudJob } from '../types.ts'
+import type { CloudConnectRequest, CloudDevProblem, CloudDevStatus, CloudJob, CloudRepositoryVisibility } from '../types.ts'
 import type { CloudDevKey } from './locales.ts'
 import css from './CloudPage.module.css'
 
@@ -75,6 +76,7 @@ export function CloudPage(props: CloudPageProps): ReactNode {
   const [editing, setEditing] = useState(false)
   const [token, setToken] = useState('')
   const [repository, setRepository] = useState('')
+  const [visibility, setVisibility] = useState<CloudRepositoryVisibility>('private')
   const [busy, setBusy] = useState<'connect' | 'disconnect'>()
   const [checking, setChecking] = useState(false)
   const [problem, setProblem] = useState<string>()
@@ -92,7 +94,10 @@ export function CloudPage(props: CloudPageProps): ReactNode {
   const accept = (next: CloudDevStatus): void => {
     setStatus(next)
     // A background refresh never replaces what the person is typing.
-    if (!editingRef.current) setRepository(next.settings.repository)
+    if (!editingRef.current) {
+      setRepository(next.settings.repository)
+      setVisibility(next.settings.visibility)
+    }
   }
   const readStatus = async (): Promise<void> => {
     setChecking(true)
@@ -167,7 +172,7 @@ export function CloudPage(props: CloudPageProps): ReactNode {
     setBusy('connect')
     setProblem(undefined)
     props
-      .connect({ token: token.trim(), repository: repository.trim() })
+      .connect({ token: token.trim(), repository: repository.trim(), visibility })
       .then((next) => {
         if (!alive.current) return
         editingRef.current = false
@@ -260,6 +265,23 @@ export function CloudPage(props: CloudPageProps): ReactNode {
           </label>
         </li>
       </ol>
+      {repository.trim() === '' && (
+        <div className={css.creationVisibility}>
+          <div className={css.visibilityRow}>
+            <span>{t('newRepositoryVisibility')}</span>
+            <span className={css.visibilityChoice}>
+              {t(visibility)}
+              <Switch
+                checked={visibility === 'public'}
+                label={t('createPublicRunner')}
+                disabled={busy !== undefined}
+                onChange={value => setVisibility(value ? 'public' : 'private')}
+              />
+            </span>
+          </div>
+          <p className={css.muted}>{t('visibilityHint')}</p>
+        </div>
+      )}
       <details className={css.advanced} open={status?.settings.repository !== ''}>
         <summary>{t('existingRepo')}</summary>
         <label className={css.field}>
@@ -275,6 +297,12 @@ export function CloudPage(props: CloudPageProps): ReactNode {
           <span className={css.muted}>{t('repositoryHint')}</span>
         </label>
       </details>
+      {(visibility === 'public' || status?.visibility === 'public') && (
+        <p className={css.notice} role="status">
+          <IconWarningOutlineRegular size={16} />
+          <span>{t('publicExposure')}</span>
+        </p>
+      )}
       {problem !== undefined && (
         <p className={css.error} role="alert">
           <IconWarningOutlineRegular size={16} />
@@ -301,6 +329,7 @@ export function CloudPage(props: CloudPageProps): ReactNode {
                 setToken('')
                 setProblem(undefined)
                 setRepository(status?.settings.repository ?? '')
+                setVisibility(status?.settings.visibility ?? 'private')
               }}
             >
               {t('cancel')}
@@ -339,6 +368,12 @@ export function CloudPage(props: CloudPageProps): ReactNode {
               </dd>
             </div>
           )}
+          {status.visibility !== null && (
+            <div>
+              <dt>{t('repositoryVisibility')}</dt>
+              <dd>{t(status.visibility)}</dd>
+            </div>
+          )}
         </dl>
         <Button
           variant="outline"
@@ -351,6 +386,12 @@ export function CloudPage(props: CloudPageProps): ReactNode {
           {t('edit')}
         </Button>
       </div>
+      {status.visibility === 'public' && (
+        <p className={css.notice} role="status">
+          <IconWarningOutlineRegular size={16} />
+          <span>{t('publicExposure')}</span>
+        </p>
+      )}
       {status.problem !== 'none' && status.problem !== 'token-missing' && (
         <div className={css.notice} role="status">
           <IconWarningOutlineRegular size={16} />

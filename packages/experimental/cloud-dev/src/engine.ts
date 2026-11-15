@@ -8,6 +8,7 @@ import { snapshot, type SnapshotFile } from './snapshot.ts'
 import type {
   CloudJob,
   CloudJobResult,
+  CloudRepositoryVisibility,
   CloudRunRequest,
   CloudStartedJob,
   CloudTaskOrigin,
@@ -63,12 +64,19 @@ export class CloudEngine {
 
   /** Verify the token, then resolve and check the runner; the automatic runner is created when missing.
    * @param gateway Deployment gateway base URL.
-   * @param choice The person's runner choice An empty choice selects the account-owned private runner.
+   * @param choice The person's runner choice An empty choice selects the account-owned automatic runner.
    * @param token GitHub credential kept outside model-visible values.
    * @param signal Cancellation.
+   * @param visibility Creation visibility Defaults to private Existing repositories use their GitHub visibility.
    * @returns Engine for the resolved runner The caller installs the workflow before admitting tasks.
    */
-  static async prepare(gateway: string, choice: string, token: string, signal: AbortSignal): Promise<CloudEngine> {
+  static async prepare(
+    gateway: string,
+    choice: string,
+    token: string,
+    signal: AbortSignal,
+    visibility: CloudRepositoryVisibility = 'private',
+  ): Promise<CloudEngine> {
     const account = await new GitHubClient(gateway, token, '').account(signal)
     if (account.missing.length > 0)
       throw new CloudDevError(
@@ -78,9 +86,8 @@ export class CloudEngine {
       )
     const automatic = choice === ''
     const engine = new CloudEngine(gateway, automatic ? `${account.login}/${AUTOMATIC_RUNNER}` : choice, token)
-    let repository: { private: boolean }
     try {
-      repository = await engine.github.json(engine.github.repo(), { signal })
+      await engine.github.json(engine.github.repo(), { signal })
     } catch (error) {
       if (!(error instanceof CloudDevError) || error.status !== 404) throw error
       if (!automatic)
@@ -90,29 +97,23 @@ export class CloudEngine {
           'runner-missing',
         )
       try {
-        repository = await engine.github.json('user/repos', {
+        await engine.github.json('user/repos', {
           method: 'POST',
           body: {
             name: AUTOMATIC_RUNNER,
-            private: true,
+            private: visibility === 'private',
             auto_init: true,
-            description: 'Private cloud compute for DSH programming tasks',
+            description: 'Cloud compute for DSH programming tasks',
           },
           signal,
         })
       } catch (error) {
         if (error instanceof CloudDevError && (error.status === 403 || error.status === 404))
-          throw new CloudDevError('The token cannot create the private runner repository.', error.status, 'runner-denied')
+          throw new CloudDevError('The token cannot create the runner repository.', error.status, 'runner-denied')
         if (!(error instanceof CloudDevError) || error.status !== 422) throw error
-        repository = await engine.github.json(engine.github.repo(), { signal })
+        await engine.github.json(engine.github.repo(), { signal })
       }
     }
-    if (automatic && repository.private !== true)
-      throw new CloudDevError(
-        `${engine.repository} is public, and the automatic runner must be private. Ask the user to choose a private runner repository in Cloud development.`,
-        undefined,
-        'runner-denied',
-      )
     return engine
   }
 

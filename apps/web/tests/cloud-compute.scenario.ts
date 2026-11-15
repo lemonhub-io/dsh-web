@@ -205,17 +205,17 @@ export async function cloudComputeScenario(
       return
     }
     if (path === 'user/repos') {
-      if (body.private !== true || body.auto_init !== true)
-        throw new Error('Automatic runner was not private and initialized')
+      if (body.private !== false || body.auto_init !== true)
+        throw new Error('The public runner choice did not reach repository creation')
       repository = true
-      await json(route, 201, { private: true, default_branch: 'main' })
+      await json(route, 201, { private: false, default_branch: 'main' })
       return
     }
     if (path === 'repos/cloud-fixture/dsh-cloud-runner') {
       await json(
         route,
         repository ? 200 : 404,
-        repository ? { private: true, default_branch: 'main' } : { message: 'Not found' },
+        repository ? { private: false, default_branch: 'main' } : { message: 'Not found' },
       )
       return
     }
@@ -415,6 +415,16 @@ export async function cloudComputeScenario(
       clearTimeout(timer)
     }
   }
+  const openPanel = async (): Promise<void> => {
+    for (const dialog of await page.getByRole('dialog').all()) {
+      const close = dialog.getByRole('button', { name: /^(关闭|Close)$/ }).first()
+      if (await close.isVisible()) await close.click()
+    }
+    if (await page.getByRole('heading', { name: '云原生开发', exact: true }).isVisible()) return
+    const entry = page.getByRole('button', { name: '云原生开发', exact: true })
+    if (!(await entry.isVisible())) await page.getByRole('button', { name: '更多', exact: true }).first().click()
+    await page.getByText('云原生开发', { exact: true }).click()
+  }
   try {
     await page.goto(origin, { waitUntil: 'domcontentloaded' })
     await page.locator('[data-composer-input]').first().waitFor({ timeout: 150000 })
@@ -422,6 +432,26 @@ export async function cloudComputeScenario(
     if (await notice.isVisible()) await notice.click()
     await remote(page, 'credentials/set', { ref: 'DEEPSEEK_API_KEY', value: 'sk-cloud-compute-fixture' })
     await remote(page, 'credentials/set', { ref: 'DSH_CLOUD_GITHUB_TOKEN', value: token ?? 'cloud-fixture-token' })
+    if (token === undefined) {
+      await openPanel()
+      await page.getByRole('button', { name: '修改', exact: true }).click()
+      const choice = page.getByRole('switch', { name: '新建公开运行仓库', exact: true })
+      if ((await choice.getAttribute('aria-checked')) !== 'false')
+        throw new Error('Existing settings without visibility did not default to private')
+      await choice.click()
+      await page.getByText('公开仓库中的工作区快照和运行日志可被任何人查看', { exact: true }).waitFor()
+      await page.setViewportSize({ width: 390, height: 844 })
+      await choice.scrollIntoViewIfNeeded()
+      await capture?.(page, 'cloud-public-connection')
+      await page.getByRole('button', { name: '保存', exact: true }).click()
+      await page.getByRole('heading', { name: 'AI 计算任务', exact: true }).waitFor()
+      const connected = await remote<{ settings: { visibility: string }; visibility: string; problem: string }>(page, 'cloudDev/status', {})
+      if (connected.problem !== 'none' || connected.settings.visibility !== 'public' || connected.visibility !== 'public')
+        throw new Error('The public runner connection or saved visibility was lost')
+      checks.push('Legacy settings default to private and the UI creates and saves a public runner with an exposure notice')
+      await page.setViewportSize({ width: 1280, height: 960 })
+      healthReads = 0
+    }
     const session = await remote<{ sessionId: string }>(page, 'session/create', { request: {} })
     await remote(page, 'session/prompt', {
       request: {
@@ -440,7 +470,7 @@ export async function cloudComputeScenario(
     checks.push('The assembled model request contains the recorded browser restrictions and complete cloud programming guidance')
     checks.push('A transient cloud outage reports failed and recovers without requesting credentials or local execution')
     checks.push('The installed runner workflow preserves setup exports through native task execution and output collection')
-    checks.push('The private runner and workflow were prepared automatically without a manual setup action')
+    checks.push('The runner and workflow were prepared automatically and an existing public runner accepts compute tasks')
     checks.push('Setup commands toolchain versions and output selection reached one cloud dispatch')
     checks.push('Environment secrets were excluded and the immutable task origin was recorded')
     checks.push('The AI resumed a pending job collected its result and read the returned report with answer 42')
@@ -456,13 +486,7 @@ export async function cloudComputeScenario(
     await wait(denied)
     if (!foreignDenied) throw new Error('A foreign Session controlled another task')
     checks.push('A different Session could not control the task')
-    for (const dialog of await page.getByRole('dialog').all()) {
-      const close = dialog.getByRole('button', { name: /^(关闭|Close)$/ }).first()
-      if (await close.isVisible()) await close.click()
-    }
-    const entry = page.getByRole('button', { name: '云原生开发', exact: true })
-    if (!(await entry.isVisible())) await page.getByRole('button', { name: '更多', exact: true }).first().click()
-    await page.getByText('云原生开发', { exact: true }).click()
+    await openPanel()
     await page.getByRole('heading', { name: 'AI 计算任务', exact: true }).waitFor()
     await page.getByText(jobId, { exact: true }).waitFor()
     if (
@@ -473,8 +497,6 @@ export async function cloudComputeScenario(
     await capture?.(page, 'cloud-compute-desktop')
     await page.setViewportSize({ width: 390, height: 844 })
     await page.emulateMedia({ colorScheme: 'dark' })
-    const collapse = page.getByRole('button', { name: '收起侧边栏', exact: true })
-    if (await collapse.isVisible()) await collapse.click()
     await page.getByRole('heading', { name: '云原生开发', exact: true }).scrollIntoViewIfNeeded()
     await capture?.(page, 'cloud-compute-mobile')
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))

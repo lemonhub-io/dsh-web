@@ -1,7 +1,7 @@
 /**
  * Cloud development: the browser stays a stateless front end, a Cloudflare Worker is the stateless
  * gateway, and GitHub Actions compiles and runs workspace snapshots asynchronously. Job state lives
- * in GitHub (job branches, runs and artifacts); this plugin keeps only the person's runner choice and
+ * in GitHub (job branches, runs and artifacts); this plugin keeps the person's runner and creation visibility choices and
  * a GitHub token in the credential store. The gateway URL is deployment configuration.
  * @module @deepseek-ai/dsh-experimental-cloud-dev
  */
@@ -39,6 +39,7 @@ export type {
   CloudDevStatus,
   CloudJob,
   CloudJobResult,
+  CloudRepositoryVisibility,
   CloudRunRequest,
   CloudStartedJob,
 } from './types.ts'
@@ -46,7 +47,7 @@ export { RUNNER_WORKFLOW, RUNNER_WORKFLOW_FILE, RUNNER_WORKFLOW_PATH } from './r
 export { parseRepository } from './github.ts'
 export { BROWSER_ENVIRONMENT, cloudGuidance, type CloudWorkspace } from './prompt.ts'
 
-/** Deployment configuration; the person only chooses a runner repository in the panel. */
+/** Deployment configuration The panel supplies runner and creation visibility choices. */
 export const Config = z
   .object({
     /** Base URL of the stateless gateway Worker that serves artifact and log downloads. */
@@ -232,11 +233,16 @@ export default class CloudDevService extends TypertRemoteService {
 
   private async readSettings(): Promise<CloudDevSettings> {
     try {
-      const stored = JSON.parse(await readFile(this.settingsFile, 'utf8')) as { repository?: unknown }
-      return { repository: typeof stored.repository === 'string' ? parseRepository(stored.repository) : '' }
+      const stored = JSON.parse(await readFile(this.settingsFile, 'utf8')) as { repository?: unknown; visibility?: unknown }
+      if (stored.visibility !== undefined && stored.visibility !== 'private' && stored.visibility !== 'public')
+        throw new CloudDevError('Invalid runner creation visibility Reconnect through Cloud development')
+      return {
+        repository: typeof stored.repository === 'string' ? parseRepository(stored.repository) : '',
+        visibility: stored.visibility ?? 'private',
+      }
     } catch (error) {
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT')
-        return { repository: '' }
+        return { repository: '', visibility: 'private' }
       throw new CloudDevError('Cloud connection settings could not be read Reconnect through Cloud development')
     }
   }
@@ -267,7 +273,7 @@ export default class CloudDevService extends TypertRemoteService {
   }
 
   private async prepare(settings: CloudDevSettings, token: string, signal: AbortSignal): Promise<CloudPreparation> {
-    const engine = await CloudEngine.prepare(this.gateway, settings.repository, token, signal)
+    const engine = await CloudEngine.prepare(this.gateway, settings.repository, token, signal, settings.visibility)
     return { engine, change: await engine.installWorkflow(signal) }
   }
 
@@ -346,6 +352,7 @@ export default class CloudDevService extends TypertRemoteService {
       problem: 'none',
       account: null,
       runner: settings.repository === '' ? null : settings.repository,
+      visibility: null,
       defaultDirectory: this.defaultDirectory(),
       tokenRef: TOKEN_REF,
     }
@@ -374,7 +381,8 @@ export default class CloudDevService extends TypertRemoteService {
     }
     try {
       const engine = new CloudEngine(this.gateway, status.runner, token)
-      await engine.github.json(engine.github.repo(), { signal })
+      const repository = await engine.github.json<{ private: boolean }>(engine.github.repo(), { signal })
+      status.visibility = repository.private ? 'private' : 'public'
     } catch (error) {
       signal.throwIfAborted()
       const code = error instanceof CloudDevError ? error.status : undefined
@@ -401,7 +409,10 @@ export default class CloudDevService extends TypertRemoteService {
       return await this.operation(signal, async (active) => {
         await this.settled()
         active.throwIfAborted()
-        const settings: CloudDevSettings = { repository: parseRepository(request.repository) }
+        const settings: CloudDevSettings = {
+          repository: parseRepository(request.repository),
+          visibility: request.visibility ?? 'private',
+        }
         const supplied = request.token?.trim() ?? ''
         if (/\s/.test(supplied))
           throw new CloudDevError('The GitHub token cannot contain spaces', undefined, 'token-invalid')

@@ -1,10 +1,15 @@
 /** Browser-safe shapes shared by the cloud development host service and its panel. */
 import type {} from '@deepseek-ai/dsh-typert-protocol'
 
-/** The person's only connection choice; the gateway and workflow belong to the deployment. */
+/** GitHub repository visibility. */
+export type CloudRepositoryVisibility = 'private' | 'public'
+
+/** Runner connection choices The gateway and workflow belong to the deployment. */
 export interface CloudDevSettings {
-  /** Runner repository as owner/name; empty selects the token owner's private `dsh-cloud-runner`. */
+  /** Runner repository as owner/name; empty selects the token owner's `dsh-cloud-runner`. */
   repository: string
+  /** Visibility when creating an automatic runner Existing repositories use their GitHub visibility. */
+  visibility: CloudRepositoryVisibility
 }
 
 /** What blocks the next cloud task, or `none` when the AI can run one. */
@@ -33,6 +38,8 @@ export interface CloudDevStatus {
   account: string | null
   /** Runner repository tasks use, as owner/name, once known. */
   runner: string | null
+  /** Actual visibility reported by GitHub, or null until the runner can be read. */
+  visibility: CloudRepositoryVisibility | null
   /** Default directory for authenticated Remote requests AI tools use the Session directory. */
   defaultDirectory: string
   /** Credential reference holding the GitHub token. */
@@ -43,8 +50,10 @@ export interface CloudDevStatus {
 export interface CloudConnectRequest {
   /** New GitHub token; omitted or blank keeps the stored token. */
   token?: string
-  /** Runner choice as owner/name or a GitHub repository link; empty selects the automatic private runner. */
+  /** Runner choice as owner/name or a GitHub repository link; empty selects the automatic runner. */
   repository: string
+  /** Creation visibility Omitted selects private Existing repository visibility is managed on GitHub. */
+  visibility?: CloudRepositoryVisibility
 }
 
 /** One job as GitHub reports it; the branch dsh-cloud/<id> identifies it. */

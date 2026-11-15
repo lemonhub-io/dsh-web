@@ -21,7 +21,7 @@ export class CloudDevError extends Error {
 /** Branch prefix that marks a commit as a cloud development job. */
 export const JOB_BRANCH_PREFIX = 'dsh-cloud/'
 
-/** Repository name of the automatic private runner in the token owner's account. */
+/** Repository name of the automatic runner in the token owner's account. */
 export const AUTOMATIC_RUNNER = 'dsh-cloud-runner'
 
 /** Classic-token scopes that runner creation, workflow installation and dispatch need. */
