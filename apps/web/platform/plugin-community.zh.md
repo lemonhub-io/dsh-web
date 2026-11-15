@@ -6,7 +6,7 @@
 
 ## 安装插件
 
-打开插件社区即可发现带有 `dsh-plugin` 主题的仓库。按关键词搜索或粘贴 `owner/repository`、GitHub 仓库地址或 `https://github.com/owner/repository/tree/ref/package-directory` 目录链接。在仓库卡片上选择查看插件即可列出其中的插件，再选择安装进入检查。每次选择固定一个提交并按 Git blob 标识校验所有下载文件。其他安装方式接受现有 HTTPS 市场目录、插件包链接和本地 `.tgz` 文件，本地文件也可以直接拖入页面。社区校验包身份、发行摘要、DSH 和 Node 版本要求、Worker 包装代数、支持的 Node 能力及可解析依赖。用户必须先确认信任来源。安装记录为停用的 profile 依赖，检查对话框提供前往插件管理的入口，启用、配置与卸载都在插件管理页完成。插件社区只负责发现与安装。刷新浏览器后安装包与启用选择保留在浏览器的常规 DSH 主目录存储中。
+打开插件社区即可发现带有 `dsh-plugin` 主题的仓库。按关键词搜索或粘贴 `owner/repository`、GitHub 仓库地址或 `https://github.com/owner/repository/tree/ref/package-directory` 目录链接。结果可按最近更新或星标数排序，结果中的共同主题可在不重新请求的情况下筛选列表。卡片在 GitHub 提供时显示星标数、最近推送时间和许可证。在仓库卡片上选择查看插件即可列出其中的插件，并显示每个包的目录、文件数、大小及固定提交下的源码链接，再选择安装进入检查。检查对话框列出来源、包大小、许可证和插件使用的 Node 模块。发现或下载失败的提示提供重试。每次选择固定一个提交并按 Git blob 标识校验所有下载文件。其他安装方式接受现有 HTTPS 市场目录、插件包链接和本地 `.tgz` 文件，本地文件也可以直接拖入页面。社区校验包身份、发行摘要、DSH 和 Node 版本要求、Worker 包装代数、支持的 Node 能力及可解析依赖。用户必须先确认信任来源。安装记录为停用的 profile 依赖，检查对话框提供前往插件管理的入口，启用、配置与卸载都在插件管理页完成。插件社区只负责发现与安装。刷新浏览器后安装包与启用选择保留在浏览器的常规 DSH 主目录存储中。
 
 Cordis 插件拥有与内置插件相同的浏览器宿主权限，包括工作区、会话、设置和凭据访问。仅安装可信发布者的插件，Node 兼容层不会隔离各个 Cordis 插件。兼容性预检不证明行为无害，也不能保证动态导入与每个 Node 操作都能成功。激活失败由 Cordis 的常规生命周期报告。
 
@@ -41,7 +41,7 @@ node --import tsx/esm scripts/pack-web-plugin.ts --src apps/web/plugin-examples/
 <a id="community-backend"></a>
 ## 社区后端
 
-GitHub 发现与源码下载通过独立 Worker `https://dsh-community.openhub.today` 完成。`ui-plugin-manager` 条目支持通过 `communityBackendUrl` 选择其他 HTTPS 后端。Worker 提供只读的公开仓库搜索、元数据、提交、树和 blob 接口 在获取仓库数据前检查仓库可见性 并将搜索结果过滤为公开仓库。仓库响应仅包含发现所需字段 浏览器继续执行提交固定、blob 哈希验证和包检查。
+GitHub 发现与源码下载通过独立 Worker `https://dsh-community.openhub.today` 完成。`ui-plugin-manager` 条目支持通过 `communityBackendUrl` 选择其他 HTTPS 后端。Worker 提供只读的公开仓库搜索、元数据、提交、树和 blob 接口 在获取仓库数据前检查仓库可见性 并将搜索结果过滤为公开仓库。仓库响应仅包含发现展示的字段：名称、简介、默认分支、星标数、最近推送时间、主题和 SPDX 许可证。搜索接受 `sort=updated` 或 `sort=stars`。浏览器继续执行提交固定、blob 哈希验证和包检查。
 
 可选的 `GITHUB_TOKEN` secret 在 Worker 内认证上游请求。允许的浏览器来源通过 `ALLOWED_ORIGINS` 配置 默认允许本机开发。可变结果缓存 60 秒 不可变树和 blob 缓存一小时 `CACHE_SECONDS`、`IMMUTABLE_CACHE_SECONDS` 与 `MAX_RESPONSE_BYTES` 配置这些限制。上游额度限制响应会进入社区已有的错误提示。
 

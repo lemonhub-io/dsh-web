@@ -2,8 +2,19 @@
 const API = 'https://api.github.com/'
 const REPOSITORY = /^repos\/([\w.-]+\/[\w.-]+)(?:\/(commits\/[^/]+|git\/(?:trees|blobs)\/[a-f0-9]{40}))?$/
 
+const SORTS = new Set(['updated', 'stars'])
+
 function publicRepository(info) {
-  return { full_name: info.full_name, description: info.description, default_branch: info.default_branch, private: false }
+  return {
+    full_name: info.full_name,
+    description: info.description,
+    default_branch: info.default_branch,
+    private: false,
+    stargazers_count: Number.isSafeInteger(info.stargazers_count) ? info.stargazers_count : 0,
+    pushed_at: typeof info.pushed_at === 'string' ? info.pushed_at : null,
+    topics: Array.isArray(info.topics) ? info.topics.filter(topic => typeof topic === 'string').slice(0, 20) : [],
+    license: typeof info.license?.spdx_id === 'string' && info.license.spdx_id !== 'NOASSERTION' ? info.license.spdx_id : null,
+  }
 }
 
 function json(status, value) {
@@ -83,7 +94,9 @@ export default {
     if (search) {
       const query = url.searchParams.get('q') ?? ''
       if (query.length > 256) return reply(json(400, { error: 'query too long' }))
-      upstream.search = new URLSearchParams({ q: `${query} is:public`, per_page: '24', sort: 'updated' }).toString()
+      const sort = url.searchParams.get('sort') ?? 'updated'
+      if (!SORTS.has(sort)) return reply(json(400, { error: 'unsupported sort' }))
+      upstream.search = new URLSearchParams({ q: `${query} is:public`, per_page: '24', sort }).toString()
     } else if (repository?.[2]?.startsWith('git/trees/')) upstream.search = 'recursive=1'
     const headers = new Headers({
       accept: 'application/vnd.github+json',

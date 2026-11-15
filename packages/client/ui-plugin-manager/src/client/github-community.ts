@@ -10,7 +10,17 @@ export interface GitHubRepository {
   description: string
   branch: string
   directory: string
+  /** Stargazer count; 0 when the backend omits it. */
+  stars: number
+  /** ISO time of the latest push, when the backend reports it. */
+  pushed?: string
+  /** Repository topics as reported by GitHub. */
+  topics: string[]
+  /** SPDX license identifier, when GitHub recognises one. */
+  license?: string
 }
+/** Search orders accepted by the community backend. */
+export type GitHubSort = 'updated' | 'stars'
 interface GitHubFile {
   path: string
   sha: string
@@ -25,6 +35,8 @@ export interface GitHubPackage {
   name: string
   version: string
   description: string
+  /** Package `license` field, empty when absent. */
+  license: string
   files: GitHubFile[]
 }
 const segment = /^[A-Za-z0-9_.@+-]+$/
@@ -53,21 +65,27 @@ function repository(value: unknown): GitHubRepository {
   const item = object(value)
   const name = text(item.full_name)
   if (!/^[\w.-]+\/[\w.-]+$/.test(name)) throw new CommunitySourceError('invalid')
+  const license = item.license
   return {
     name,
     description: typeof item.description === 'string' ? item.description : '',
     branch: text(item.default_branch),
     directory: '',
+    stars: typeof item.stargazers_count === 'number' && Number.isSafeInteger(item.stargazers_count) && item.stargazers_count > 0 ? item.stargazers_count : 0,
+    topics: Array.isArray(item.topics) ? item.topics.filter((topic): topic is string => typeof topic === 'string' && /^[a-z0-9-]{1,50}$/.test(topic)) : [],
+    ...(typeof item.pushed_at === 'string' && !Number.isNaN(Date.parse(item.pushed_at)) ? { pushed: item.pushed_at } : {}),
+    ...(typeof license === 'string' && /^[\w.+-]{1,64}$/.test(license) ? { license } : {}),
   }
 }
 
 /** Find tagged repositories or resolve an explicit owner/repository or GitHub tree URL.
  * @param query Search terms or public repository address.
+ * @param sort Search order; ignored for an explicit address.
  * @param signal Caller-owned cancellation and deadline.
  * @param backend Worker backend URL.
  * @returns Up to 24 repositories No credentials or code-search authentication is required.
  */
-export async function discoverGitHub(query: string, signal: AbortSignal, backend: string): Promise<GitHubRepository[]> {
+export async function discoverGitHub(query: string, sort: GitHubSort, signal: AbortSignal, backend: string): Promise<GitHubRepository[]> {
   let target = query
     .trim()
     .replace(/^https:\/\/github\.com\//i, '')
@@ -91,7 +109,7 @@ export async function discoverGitHub(query: string, signal: AbortSignal, backend
   const search = new URLSearchParams({
     q: `${target} topic:dsh-plugin archived:false`,
     per_page: '24',
-    sort: 'updated',
+    sort,
   })
   const result = object(await json(backend, 'search/repositories?' + search.toString(), signal))
   if (!Array.isArray(result.items) || result.items.length > 24) throw new CommunitySourceError('invalid')
@@ -196,6 +214,7 @@ export async function githubPackages(repo: GitHubRepository, signal: AbortSignal
       name: text(info.name),
       version: text(info.version),
       description: typeof info.description === 'string' ? info.description : '',
+      license: typeof info.license === 'string' ? info.license : '',
       files: selected,
     })
   }
