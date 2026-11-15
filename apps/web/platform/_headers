@@ -1,0 +1,23 @@
+/*
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+
+/index.html
+  Cache-Control: no-cache
+
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/preview/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/preview/vfs-image.tar.gz
+  ! Cache-Control
+  Cache-Control: no-cache, no-transform

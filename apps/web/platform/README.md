@@ -2,18 +2,18 @@
 
 English | [中文](README.zh.md)
 
-Build and publish the static site. The build sets the visible name, so client bundles and the image must be built with `DSH_CLIENT_TITLE` in the environment.
+Cloudflare Workers serves the static site, including the runtime and VFS image. The visitor's browser runs the harness in a dedicated Web Worker. Set `DSH_CLIENT_TITLE` when building the client bundles and image.
 
 ```sh
 export DSH_CLIENT_TITLE='DSH Web'
 NODE_OPTIONS=--max-old-space-size=8192 pnpm run build:lib:client
 pnpm --filter @deepseek-ai/dsh-web-frontend run build:site
-rsync -a --delete apps/web/dist-site/ /www/daum/dsh-web-site/
+npx --yes wrangler@4.145.0 deploy --config apps/web/platform/wrangler.jsonc
 ```
 
-CI builds the same site on every push to `web-platform` (`.github/workflows/dsh-web.yml`) and runs the installed-app and web-platform end-to-end tests. The `dist-site` build is kept as a workflow artifact for seven days. The publish job copies that artifact to the server only while the repository variable `DSH_WEB_SSH_DEPLOY` is `true`, because it needs a server key that is not yet provisioned. Until then, download the artifact and run the `rsync` above.
+Run Wrangler from the repository root with the Workers deployment token and account ID available as `CF_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. CI builds and tests every push to `web-platform` and keeps `dist-site` for seven days. The optional publish job uses `DSH_WEB_WORKERS_DEPLOY=true`, the `DSH_WEB_WORKERS_TOKEN` secret and the `DSH_WEB_WORKERS_ACCOUNT_ID` variable.
 
-The host must serve `sw.js` and `index.html` with `Cache-Control: no-cache`, because a stale service worker pins an old version. Serve files as stored, without rewrite rules: a missing file has to be a 404. `vfs-image.tar.gz` must keep its `Content-Length` and must not be compressed again.
+The Worker serves `index.html` at `/` and Cloudflare returns 404 for missing files. The packaged `_headers` gives the service worker, entry page and VFS image revalidation headers. The image retains its gzip bytes and `Content-Length`.
 
 Each file in the service worker is pinned to a content hash. A version downloads only files whose hash changed, and it refuses to install while the host serves anything else, so a half-finished deployment waits for the next update check instead of pinning a broken version.
 
@@ -25,4 +25,4 @@ To refresh the screenshots in the install dialog, run `pnpm exec tsx scripts/cap
 
 DSH Web uses API keys only. Account login, account settings, and the account model route are disabled in the Worker image; the sidebar keeps Settings, and first-use model setup opens the API-key editor directly.
 
-The live site is `dsh.openhub.today`. The `dsh-openhub` Cloudflare tunnel forwards it to a loopback Caddy listener on `127.0.0.1:3092`, a block in `/etc/caddy/Caddyfile`. The old address `dsh.daum.pw` redirects there.
+The Worker serves `https://dsh-web.mzhub.workers.dev`. To serve the same deployment on `dsh.openhub.today`, bind the `dsh.openhub.today/*` route to `dsh-web` using a credential with Workers Routes Write on `openhub.today`. The existing DNS record stays in place. Removing the route restores the tunnel to Caddy on `127.0.0.1:3092`. The address `dsh.daum.pw` redirects to `dsh.openhub.today`.

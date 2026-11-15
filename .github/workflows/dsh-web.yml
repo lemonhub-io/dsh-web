@@ -1,7 +1,7 @@
 name: DSH Web
 
 # Builds the browser build of DSH Web and runs its installed-app and web-platform
-# end-to-end tests. Pushes to web-platform also publish the build to dsh.openhub.today
+# end-to-end tests. Pushes to web-platform also publish the build to Cloudflare Workers
 # once the publish job is enabled; see apps/web/platform/README.md.
 on:
   push:
@@ -65,33 +65,33 @@ jobs:
         run: pnpm exec vitest run --config vitest.web.config.ts apps/web/tests/pwa.e2e.ts apps/web/tests/web-platform.e2e.ts apps/web/tests/cordis-community.e2e.ts apps/web/tests/cloud-compute.e2e.ts
 
   publish:
-    name: Publish to dsh.openhub.today
+    name: Publish to Cloudflare Workers
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/web-platform' && vars.DSH_WEB_SSH_DEPLOY == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/web-platform' && vars.DSH_WEB_WORKERS_DEPLOY == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
       group: dsh-web-publish
       cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - uses: actions/download-artifact@v4
         with:
           name: dsh-web-site
-          path: dist-site
-      - name: Connect to the server
+          path: apps/web/dist-site
+      - name: Deploy to Cloudflare Workers
         env:
-          DEPLOY_KEY_B64: ${{ secrets.DSH_DEPLOY_KEY_B64 }}
-          KNOWN_HOSTS_B64: ${{ secrets.DSH_DEPLOY_KNOWN_HOSTS_B64 }}
-        run: |
-          install -d -m 700 ~/.ssh
-          echo "$DEPLOY_KEY_B64" | base64 -d > ~/.ssh/dsh_web_deploy
-          chmod 600 ~/.ssh/dsh_web_deploy
-          echo "$KNOWN_HOSTS_B64" | base64 -d > ~/.ssh/known_hosts
-      - name: Upload the site
-        run: tar -C dist-site -cf - . | ssh -p 22222 -i ~/.ssh/dsh_web_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes lemon@23.251.32.150
+          CF_API_TOKEN: ${{ secrets.DSH_WEB_WORKERS_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.DSH_WEB_WORKERS_ACCOUNT_ID }}
+        run: npx --yes wrangler@4.145.0 deploy --config apps/web/platform/wrangler.jsonc
       - name: Confirm the live version
         run: |
-          expected=$(grep -o "const VERSION = '[^']*'" dist-site/sw.js)
-          live=$(curl -fsS "https://dsh.openhub.today/sw.js?ci=${GITHUB_SHA}" | grep -o "const VERSION = '[^']*'")
+          expected=$(grep -o "const VERSION = '[^']*'" apps/web/dist-site/sw.js)
+          live=$(curl -fsS "https://dsh-web.mzhub.workers.dev/sw.js?ci=${GITHUB_SHA}" | grep -o "const VERSION = '[^']*'")
           test -n "$expected" && test "$live" = "$expected"
           echo "live: $expected"

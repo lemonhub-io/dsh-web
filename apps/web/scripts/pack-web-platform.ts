@@ -110,6 +110,8 @@ writeFileSync(join(out, 'sw.js'), template
   .replace('__DSH_SITE_VERSION__', version)
   .replace('__DSH_PRECACHE__', fileMap(precache))
   .replace('__DSH_LAZY__', fileMap(cached.filter(isLazy))))
+// Cloudflare consumes this file during upload, so it stays outside the offline cache.
+cpSync(join(webRoot, 'platform', '_headers'), join(out, '_headers'))
 
 const bytes = files.reduce((total, file) => total + statSync(join(out, file)).size, 0)
 console.log(`pack-web-platform: ${String(files.length)} files, ${String(Math.round(bytes / 1048576))} MiB, ${String(precache.length)} precached, version ${version}, in ${relative(process.cwd(), out)}`)
