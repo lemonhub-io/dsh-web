@@ -212,7 +212,7 @@
   padding-top: 12px;
 }
 
-.creationVisibility {
+.visibilityField {
   display: flex;
   flex-direction: column;
   gap: 8px;

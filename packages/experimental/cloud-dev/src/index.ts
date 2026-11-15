@@ -1,7 +1,7 @@
 /**
  * Cloud development: the browser stays a stateless front end, a Cloudflare Worker is the stateless
  * gateway, and GitHub Actions compiles and runs workspace snapshots asynchronously. Job state lives
- * in GitHub (job branches, runs and artifacts); this plugin keeps the person's runner and creation visibility choices and
+ * in GitHub (job branches, runs and artifacts); this plugin keeps the person's runner and visibility choices and
  * a GitHub token in the credential store. The gateway URL is deployment configuration.
  * @module @deepseek-ai/dsh-experimental-cloud-dev
  */
@@ -47,7 +47,7 @@ export { RUNNER_WORKFLOW, RUNNER_WORKFLOW_FILE, RUNNER_WORKFLOW_PATH } from './r
 export { parseRepository } from './github.ts'
 export { BROWSER_ENVIRONMENT, cloudGuidance, type CloudWorkspace } from './prompt.ts'
 
-/** Deployment configuration The panel supplies runner and creation visibility choices. */
+/** Deployment configuration The panel supplies runner and visibility choices. */
 export const Config = z
   .object({
     /** Base URL of the stateless gateway Worker that serves artifact and log downloads. */
@@ -82,6 +82,8 @@ const PROBLEM_TEXT: Record<CloudDevProblem, string> = {
   'gateway': 'The cloud result gateway is unreachable. Check again later with cloud_status.',
   'runner-missing': 'The configured runner repository does not exist. Ask the user to correct it in Cloud development.',
   'runner-denied': 'The saved token cannot use the configured runner repository. Ask the user to correct it in Cloud development.',
+  'visibility-denied': 'GitHub refused the repository visibility change Check repository administration access and organization policy',
+  'visibility-unknown': 'The visibility change outcome is unconfirmed Save the connection again to verify GitHub visibility',
   'unknown': 'GitHub could not be reached. Check again later with cloud_status.',
 }
 
@@ -158,7 +160,7 @@ const TEXT_OUTPUT: ToolOutputDefinition = {
       files: { type: 'array', items: { type: 'string' } },
       problem: {
         type: 'string',
-        enum: ['none', 'token-missing', 'token-invalid', 'token-scopes', 'gateway', 'runner-missing', 'runner-denied', 'unknown'],
+        enum: ['none', 'token-missing', 'token-invalid', 'token-scopes', 'gateway', 'runner-missing', 'runner-denied', 'visibility-denied', 'visibility-unknown', 'unknown'],
       },
     },
     required: ['status', 'text'],
@@ -397,9 +399,9 @@ export default class CloudDevService extends TypertRemoteService {
   }
 
   /**
-   * Verify a token and runner choice, prepare the runner and its workflow, then store both.
-   * Nothing is stored when any step fails, so a mistyped token never replaces a working one.
-   * @param request - optional new token and the runner choice.
+   * Verify the connection, prepare the workflow and apply an explicit visibility choice before saving credentials and settings.
+   * A GitHub visibility update can commit before a later failure Repeating a save reads the current value first.
+   * @param request - optional new token, runner choice and optional visibility update.
    * @param signal - cancellation.
    * @returns readiness after the connection.
    */
@@ -418,7 +420,8 @@ export default class CloudDevService extends TypertRemoteService {
           throw new CloudDevError('The GitHub token cannot contain spaces', undefined, 'token-invalid')
         const token = supplied === '' ? await this.storedToken() : supplied
         if (token === undefined) throw new CloudDevError('Paste a GitHub token first', undefined, 'token-missing')
-        await this.prepare(settings, token, active)
+        const { engine } = await this.prepare(settings, token, active)
+        if (request.visibility !== undefined) await engine.setVisibility(request.visibility, active)
         if (supplied !== '') await this.ctx.credentials.set(credentialRef(TOKEN_REF), supplied)
         await this.writeSettings(settings)
         return await this.readStatus(active)

@@ -8,11 +8,11 @@ export type CloudRepositoryVisibility = 'private' | 'public'
 export interface CloudDevSettings {
   /** Runner repository as owner/name; empty selects the token owner's `dsh-cloud-runner`. */
   repository: string
-  /** Visibility when creating an automatic runner Existing repositories use their GitHub visibility. */
+  /** Last saved visibility choice Used for automatic repository creation. */
   visibility: CloudRepositoryVisibility
 }
 
-/** What blocks the next cloud task, or `none` when the AI can run one. */
+/** Known connection and cloud operation problems, or `none` when cloud execution is ready. */
 export type CloudDevProblem =
   /** No GitHub token is stored. */
   | 'token-missing'
@@ -26,6 +26,10 @@ export type CloudDevProblem =
   | 'runner-missing'
   /** The token cannot read the chosen runner repository or write its workflow. */
   | 'runner-denied'
+  /** GitHub denied an explicitly requested visibility change. */
+  | 'visibility-denied'
+  /** A visibility update may have committed and requires a fresh read. */
+  | 'visibility-unknown'
   /** GitHub could not be reached or answered unexpectedly. */
   | 'unknown'
   | 'none'
@@ -52,7 +56,7 @@ export interface CloudConnectRequest {
   token?: string
   /** Runner choice as owner/name or a GitHub repository link; empty selects the automatic runner. */
   repository: string
-  /** Creation visibility Omitted selects private Existing repository visibility is managed on GitHub. */
+  /** Apply this visibility when explicitly supplied Omitted preserves an existing repository and creates new ones privately. */
   visibility?: CloudRepositoryVisibility
 }
 

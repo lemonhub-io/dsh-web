@@ -52,6 +52,8 @@ const PROBLEM_KEY: Record<Exclude<CloudDevProblem, 'none'>, CloudDevKey> = {
   'gateway': 'problemGateway',
   'runner-missing': 'problemRunnerMissing',
   'runner-denied': 'problemRunnerDenied',
+  'visibility-denied': 'problemVisibilityDenied',
+  'visibility-unknown': 'problemVisibilityUnknown',
   'unknown': 'problemUnknown',
 }
 
@@ -96,7 +98,7 @@ export function CloudPage(props: CloudPageProps): ReactNode {
     // A background refresh never replaces what the person is typing.
     if (!editingRef.current) {
       setRepository(next.settings.repository)
-      setVisibility(next.settings.visibility)
+      setVisibility(next.visibility ?? next.settings.visibility)
     }
   }
   const readStatus = async (): Promise<void> => {
@@ -265,23 +267,21 @@ export function CloudPage(props: CloudPageProps): ReactNode {
           </label>
         </li>
       </ol>
-      {repository.trim() === '' && (
-        <div className={css.creationVisibility}>
-          <div className={css.visibilityRow}>
-            <span>{t('newRepositoryVisibility')}</span>
-            <span className={css.visibilityChoice}>
-              {t(visibility)}
-              <Switch
-                checked={visibility === 'public'}
-                label={t('createPublicRunner')}
-                disabled={busy !== undefined}
-                onChange={value => setVisibility(value ? 'public' : 'private')}
-              />
-            </span>
-          </div>
-          <p className={css.muted}>{t('visibilityHint')}</p>
+      <div className={css.visibilityField}>
+        <div className={css.visibilityRow}>
+          <span>{t('repositoryVisibility')}</span>
+          <span className={css.visibilityChoice}>
+            {t(visibility)}
+            <Switch
+              checked={visibility === 'public'}
+              label={t('publicRunner')}
+              disabled={busy !== undefined}
+              onChange={value => setVisibility(value ? 'public' : 'private')}
+            />
+          </span>
         </div>
-      )}
+        <p className={css.muted}>{t('visibilityHint')}</p>
+      </div>
       <details className={css.advanced} open={status?.settings.repository !== ''}>
         <summary>{t('existingRepo')}</summary>
         <label className={css.field}>
@@ -329,7 +329,7 @@ export function CloudPage(props: CloudPageProps): ReactNode {
                 setToken('')
                 setProblem(undefined)
                 setRepository(status?.settings.repository ?? '')
-                setVisibility(status?.settings.visibility ?? 'private')
+                setVisibility(status?.visibility ?? status?.settings.visibility ?? 'private')
               }}
             >
               {t('cancel')}
@@ -380,6 +380,7 @@ export function CloudPage(props: CloudPageProps): ReactNode {
           size="sm"
           onClick={() => {
             setProblem(undefined)
+            setVisibility(status.visibility ?? status.settings.visibility)
             setEditing(true)
           }}
         >

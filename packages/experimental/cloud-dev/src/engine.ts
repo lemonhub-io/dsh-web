@@ -117,6 +117,47 @@ export class CloudEngine {
     return engine
   }
 
+  /**
+   * Apply an explicitly saved visibility choice and verify GitHub's current value.
+   * A failed request can have committed remotely Repeating this operation first reads the current value.
+   * @param visibility Requested repository visibility.
+   * @param signal Cancellation of the read and update requests.
+   * @returns Once GitHub confirms the requested visibility.
+   * @throws CloudDevError with visibility-denied for permission or policy refusals, or visibility-unknown for an unconfirmed outcome.
+   */
+  async setVisibility(visibility: CloudRepositoryVisibility, signal: AbortSignal): Promise<void> {
+    const desired = visibility === 'private'
+    const current = await this.github.json<{ private: boolean }>(this.github.repo(), { signal })
+    if (current.private === desired) return
+    const unconfirmed = new CloudDevError(
+      'The visibility change outcome is unconfirmed Save again to check GitHub before applying the choice',
+      undefined,
+      'visibility-unknown',
+    )
+    try {
+      await this.github.json(this.github.repo(), {
+        method: 'PATCH',
+        body: { private: desired },
+        signal,
+      })
+    } catch (error) {
+      if (error instanceof CloudDevError && [403, 404, 422].includes(error.status ?? 0))
+        throw new CloudDevError(
+          'GitHub refused the visibility change Check repository administration access and organization policy',
+          error.status,
+          'visibility-denied',
+        )
+      throw unconfirmed
+    }
+    let confirmed: { private: boolean }
+    try {
+      confirmed = await this.github.json(this.github.repo(), { signal })
+    } catch (_confirmationFailed) {
+      throw unconfirmed
+    }
+    if (confirmed.private !== desired) throw unconfirmed
+  }
+
   private async defaultBranch(signal?: AbortSignal): Promise<string> {
     const repo = await this.github.json<{ default_branch: string }>(this.github.repo(), {
       ...(signal ? { signal } : {}),

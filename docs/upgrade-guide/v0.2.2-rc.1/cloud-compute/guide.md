@@ -1,6 +1,6 @@
 ---
 kind: upgrade-guide
-description: "Cloud development task control moves to AI tools and requires a Session origin record, and the connection keeps only the runner choice."
+description: "Cloud development task control moves to AI tools and requires a Session origin record, and the connection manages the runner and visibility choices."
 ---
 
 # AI-controlled cloud computing
@@ -11,11 +11,11 @@ English | [中文](guide.zh.md)
 
 Cloud development provides a connection and activity panel. AI submits commands and collects results through `cloud_run` and `cloud_job`. The latter waits and collects by default. Use `action: status` for a nonblocking query. AI controls verify the task's creating Session and workspace.
 
-The panel keeps only the runner repository choice. The gateway URL moves to the plugin's `gatewayUrl` configuration, and the workflow file is always `dsh-cloud-run.yml`. The `configure` and `setup` Remote methods are replaced by `connect`, which verifies the token and prepares the runner before storing either, and `disconnect`. `status` reports one `problem` with the account and runner instead of separate token, gateway, repository and workflow fields.
+The panel keeps the runner repository and selected visibility. The gateway URL moves to the plugin's `gatewayUrl` configuration, and the workflow file is always `dsh-cloud-run.yml`. The `configure` and `setup` Remote methods are replaced by `connect`, which verifies the token and prepares the runner before storing either, and `disconnect`. `status` reports one `problem` with the account and runner instead of separate token, gateway, repository and workflow fields.
 
 ## Migration
 
-Connections accept an optional `visibility` of `private` or `public` for new automatic repositories. Omitted values and older settings select private creation. Existing runners use their GitHub visibility, and public runners are supported. The status response includes the actual `visibility`, or null until the repository can be read.
+Connections accept an optional `visibility` of `private` or `public`. Supplying it applies the choice to the selected existing repository as well as new repositories. Omitting it uses existing GitHub visibility and selects private for creation. The settings form sends the selected visibility and confirms the update before saving connection settings. Visibility updates require repository administration access and organization-policy permission. Unconfirmed updates can be retried through Save, which reads the current value first. The status response includes the actual `visibility`, or null until the repository can be read.
 
 The `cloud-dev` entry's new `workspace` configuration defaults to `local`, which keeps the host shell; the DSH Web image sets `browser`, where agents keep file work local and route all installations, compilation, checks and computation through cloud tools. Put dependency and toolchain setup in `cloud_run.setup`. Setup exports and PATH changes persist through the task within one fresh job. `cloud_status` returns a `problem` code and reports transient service failures as `failed`.
 

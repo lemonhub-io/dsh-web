@@ -126,6 +126,8 @@ export async function cloudComputeScenario(
     dispatches = 0,
     runReads = 0
   let fixtureResult: Uint8Array | undefined
+  let repositoryPrivate = false
+  const visibilityUpdates: boolean[] = []
   let healthReads = 0
   let stage = 0,
     jobId = '',
@@ -156,7 +158,7 @@ export async function cloudComputeScenario(
       return
     }
     const body =
-      request.method() === 'POST' || request.method() === 'PUT'
+      request.method() === 'POST' || request.method() === 'PUT' || request.method() === 'PATCH'
         ? (request.postDataJSON() as Record<string, unknown>)
         : {}
     if (path.endsWith('/git/trees') && request.method() === 'POST') {
@@ -212,10 +214,16 @@ export async function cloudComputeScenario(
       return
     }
     if (path === 'repos/cloud-fixture/dsh-cloud-runner') {
+      if (request.method() === 'PATCH') {
+        if (!repository || typeof body.private !== 'boolean')
+          throw new Error('Invalid repository visibility update')
+        repositoryPrivate = body.private
+        visibilityUpdates.push(repositoryPrivate)
+      }
       await json(
         route,
         repository ? 200 : 404,
-        repository ? { private: false, default_branch: 'main' } : { message: 'Not found' },
+        repository ? { private: repositoryPrivate, default_branch: 'main' } : { message: 'Not found' },
       )
       return
     }
@@ -435,7 +443,7 @@ export async function cloudComputeScenario(
     if (token === undefined) {
       await openPanel()
       await page.getByRole('button', { name: '修改', exact: true }).click()
-      const choice = page.getByRole('switch', { name: '新建公开运行仓库', exact: true })
+      const choice = page.getByRole('switch', { name: '公开运行仓库', exact: true })
       if ((await choice.getAttribute('aria-checked')) !== 'false')
         throw new Error('Existing settings without visibility did not default to private')
       await choice.click()
@@ -449,6 +457,27 @@ export async function cloudComputeScenario(
       if (connected.problem !== 'none' || connected.settings.visibility !== 'public' || connected.visibility !== 'public')
         throw new Error('The public runner connection or saved visibility was lost')
       checks.push('Legacy settings default to private and the UI creates and saves a public runner with an exposure notice')
+      await page.getByRole('button', { name: '修改', exact: true }).click()
+      if ((await choice.getAttribute('aria-checked')) !== 'true')
+        throw new Error('The settings control did not reflect actual GitHub visibility')
+      await page.getByText('使用已有仓库', { exact: true }).click()
+      await page.getByPlaceholder('owner/name 或仓库链接', { exact: true }).fill('cloud-fixture/dsh-cloud-runner')
+      await choice.click()
+      await capture?.(page, 'cloud-existing-visibility')
+      await page.getByRole('button', { name: '保存', exact: true }).click()
+      await page.getByRole('heading', { name: '修改连接', exact: true }).waitFor({ state: 'hidden' })
+      const privateStatus = await remote<{ visibility: string }>(page, 'cloudDev/status', {})
+      if (privateStatus.visibility !== 'private') throw new Error('Settings did not make the named repository private')
+      await page.getByRole('button', { name: '修改', exact: true }).click()
+      if ((await choice.getAttribute('aria-checked')) !== 'false')
+        throw new Error('The confirmed private state did not survive reopening settings')
+      await choice.click()
+      await page.getByRole('button', { name: '保存', exact: true }).click()
+      await page.getByRole('heading', { name: '修改连接', exact: true }).waitFor({ state: 'hidden' })
+      const publicStatus = await remote<{ visibility: string }>(page, 'cloudDev/status', {})
+      if (publicStatus.visibility !== 'public' || JSON.stringify(visibilityUpdates) !== '[true,false]')
+        throw new Error('Settings did not apply and confirm both visibility changes')
+      checks.push('Settings change a named existing repository to private and back to public with confirmed GitHub state')
       await page.setViewportSize({ width: 1280, height: 960 })
       healthReads = 0
     }
@@ -466,6 +495,8 @@ export async function cloudComputeScenario(
     await wait(done)
     if (!complete || dispatches !== 1 || originRecord === '')
       throw new Error('Cloud task was duplicated or lost its immutable origin')
+    if (token === undefined && JSON.stringify(visibilityUpdates) !== '[true,false]')
+      throw new Error('AI compute changed the repository visibility outside an explicit settings save')
     checks.push('The AI wrote code locally and selected cloud computing through logged tool calls')
     checks.push('The assembled model request contains the recorded browser restrictions and complete cloud programming guidance')
     checks.push('A transient cloud outage reports failed and recovers without requesting credentials or local execution')
