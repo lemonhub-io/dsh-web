@@ -91,12 +91,17 @@ export default {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 33554432 ||
       [mutableTtl, immutableTtl].some(value => !Number.isSafeInteger(value) || value < 0 || value > 86400))
       return reply(json(503, { error: 'invalid Worker configuration' }))
+    let perPage = 0
     if (search) {
       const query = url.searchParams.get('q') ?? ''
       if (query.length > 256) return reply(json(400, { error: 'query too long' }))
       const sort = url.searchParams.get('sort') ?? 'updated'
       if (!SORTS.has(sort)) return reply(json(400, { error: 'unsupported sort' }))
-      upstream.search = new URLSearchParams({ q: `${query} is:public`, per_page: '24', sort }).toString()
+      perPage = Number(url.searchParams.get('per_page') ?? 24)
+      const page = Number(url.searchParams.get('page') ?? 1)
+      if (!Number.isSafeInteger(perPage) || perPage < 1 || perPage > 100 || !Number.isSafeInteger(page) || page < 1 || page * perPage > 1000)
+        return reply(json(400, { error: 'unsupported page' }))
+      upstream.search = new URLSearchParams({ q: `${query} is:public`, per_page: String(perPage), page: String(page), sort }).toString()
     } else if (repository?.[2]?.startsWith('git/trees/')) upstream.search = 'recursive=1'
     const headers = new Headers({
       accept: 'application/vnd.github+json',
@@ -143,8 +148,9 @@ export default {
       if (search) {
         const value = JSON.parse(new TextDecoder().decode(bytes))
         if (!Array.isArray(value.items)) throw new Error('invalid search result')
-        const items = value.items.filter(item => item.private === false).slice(0, 24).map(publicRepository)
-        bytes = new TextEncoder().encode(JSON.stringify({ items }))
+        const items = value.items.filter(item => item.private === false).slice(0, perPage).map(publicRepository)
+        const total = Number.isSafeInteger(value.total_count) ? value.total_count : items.length
+        bytes = new TextEncoder().encode(JSON.stringify({ total_count: total, items }))
       }
       const immutable = /\/git\/(?:trees|blobs)\//.test(path)
       const ttl = immutable ? immutableTtl : mutableTtl

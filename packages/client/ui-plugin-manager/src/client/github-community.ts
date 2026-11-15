@@ -21,6 +21,25 @@ export interface GitHubRepository {
 }
 /** Search orders accepted by the community backend. */
 export type GitHubSort = 'updated' | 'stars'
+/** Repositories requested per search page. */
+export const GITHUB_PAGE_SIZE = 50
+/** GitHub search returns at most this many results for one query. */
+export const GITHUB_RESULT_LIMIT = 1000
+/** One discovery request: keywords or an address, order, optional topic and 1-based page. */
+export interface GitHubQuery {
+  query: string
+  sort: GitHubSort
+  topic: string | undefined
+  page: number
+}
+/** One page of discovery results. */
+export interface GitHubSearch {
+  repositories: GitHubRepository[]
+  /** Matching repositories reported by GitHub, beyond the loaded page. */
+  total: number
+  /** The query named one repository address rather than search terms. */
+  direct: boolean
+}
 interface GitHubFile {
   path: string
   sha: string
@@ -79,13 +98,13 @@ function repository(value: unknown): GitHubRepository {
 }
 
 /** Find tagged repositories or resolve an explicit owner/repository or GitHub tree URL.
- * @param query Search terms or public repository address.
- * @param sort Search order; ignored for an explicit address.
+ * @param request Search terms or repository address, order, topic and page; an address ignores the others.
  * @param signal Caller-owned cancellation and deadline.
  * @param backend Worker backend URL.
- * @returns Up to 24 repositories No credentials or code-search authentication is required.
+ * @returns Up to {@link GITHUB_PAGE_SIZE} repositories and the total match count No credentials are required.
  */
-export async function discoverGitHub(query: string, sort: GitHubSort, signal: AbortSignal, backend: string): Promise<GitHubRepository[]> {
+export async function discoverGitHub(request: GitHubQuery, signal: AbortSignal, backend: string): Promise<GitHubSearch> {
+  const { query, sort, topic, page } = request
   let target = query
     .trim()
     .replace(/^https:\/\/github\.com\//i, '')
@@ -97,23 +116,29 @@ export async function discoverGitHub(query: string, sort: GitHubSort, signal: Ab
     const path = directory.map(decodeURIComponent)
     if (path.some(part => !segment.test(part) || part === '.' || part === '..'))
       throw new CommunitySourceError('invalid')
-    return [
+    const repositories = [
       {
         ...item,
         branch: branch === undefined ? item.branch : decodeURIComponent(branch),
         directory: path.join('/'),
       },
     ]
+    return { repositories, total: 1, direct: true }
   }
   target = query.trim()
   const search = new URLSearchParams({
-    q: `${target} topic:dsh-plugin archived:false`,
-    per_page: '24',
+    q: `${target}${topic === undefined ? '' : ' topic:' + topic} topic:dsh-plugin archived:false`,
+    per_page: String(GITHUB_PAGE_SIZE),
+    page: String(page),
     sort,
   })
   const result = object(await json(backend, 'search/repositories?' + search.toString(), signal))
-  if (!Array.isArray(result.items) || result.items.length > 24) throw new CommunitySourceError('invalid')
-  return result.items.map(repository)
+  if (!Array.isArray(result.items) || result.items.length > GITHUB_PAGE_SIZE) throw new CommunitySourceError('invalid')
+  const repositories = result.items.map(repository)
+  const total = typeof result.total_count === 'number' && Number.isSafeInteger(result.total_count) && result.total_count >= 0
+    ? result.total_count
+    : repositories.length
+  return { repositories, total, direct: false }
 }
 
 async function blob(backend: string, repo: string, file: GitHubFile, signal: AbortSignal): Promise<Uint8Array> {

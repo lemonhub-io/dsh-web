@@ -1,5 +1,5 @@
 /** Plugin community: discover Cordis bundles on GitHub and install them through the shared plugin manager. */
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   Button, Checkbox, Input, Modal, Pill, SegmentedControl, Tag,
@@ -16,8 +16,8 @@ import { CommunitySourceError, downloadCommunityBytes as download } from './comm
 import { age, byteSize, compactCount } from './community-format.ts'
 import type { communityZh } from './community-locales.ts'
 import {
-  discoverGitHub, downloadGitHubPackage, githubPackages,
-  type GitHubPackage, type GitHubRepository, type GitHubSort,
+  discoverGitHub, downloadGitHubPackage, githubPackages, GITHUB_PAGE_SIZE, GITHUB_RESULT_LIMIT,
+  type GitHubPackage, type GitHubQuery, type GitHubRepository, type GitHubSearch, type GitHubSort,
 } from './github-community.ts'
 
 /** Plain callbacks so the plugin manager keeps ownership of the installed inventory. */
@@ -39,6 +39,8 @@ interface Listing { name: string; version: string; description: string; url: str
 interface Origin { label: string; link?: string; license?: string }
 interface Candidate { encoded: string; size: number; report: WebBundleInspection; origin?: Origin; done?: boolean }
 type View = { kind: 'list' } | { kind: 'repository'; repository: GitHubRepository; packages: GitHubPackage[] }
+/** The loaded pages of the current discovery request. */
+type Results = GitHubQuery & GitHubSearch
 
 const SEARCH_MS = 15000, INSPECT_MS = 60000, TRANSFER_MS = 120000
 const TOPIC_LIMIT = 10
@@ -133,13 +135,11 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
   const sortId = useId()
   const [limits, setLimits] = useState<WebPackageLimits | null>()
   const [installed, setInstalled] = useState<ReadonlySet<string>>(new Set())
-  const [repositories, setRepositories] = useState<GitHubRepository[]>([])
+  const [results, setResults] = useState<Results>({ query: '', sort: 'updated', topic: undefined, page: 1, repositories: [], total: 0, direct: false })
+  const [topics, setTopics] = useState<string[]>([])
   const [searched, setSearched] = useState(false)
   const [view, setView] = useState<View>({ kind: 'list' })
   const [query, setQuery] = useState('')
-  const [submitted, setSubmitted] = useState('')
-  const [sort, setSort] = useState<GitHubSort>('updated')
-  const [topic, setTopic] = useState<string>()
   const [catalogUrl, setCatalogUrl] = useState('/plugin-community/cordis/index.json')
   const [listings, setListings] = useState<Listing[]>([])
   const [packageUrl, setPackageUrl] = useState('')
@@ -159,8 +159,10 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
   const now = Date.now()
   const deadline = (ms: number): AbortSignal => AbortSignal.any([lifetime.current.signal, AbortSignal.timeout(ms)])
   const alive = (): boolean => !lifetime.current.signal.aborted
-  const topics = useMemo(() => popularTopics(repositories), [repositories])
-  const shown = topic === undefined ? repositories : repositories.filter(repository => repository.topics.includes(topic))
+  const { repositories, sort, topic } = results
+  const loadable = Math.min(results.total, Math.floor(GITHUB_RESULT_LIMIT / GITHUB_PAGE_SIZE) * GITHUB_PAGE_SIZE)
+  const more = !results.direct && repositories.length < loadable && (results.page + 1) * GITHUB_PAGE_SIZE <= GITHUB_RESULT_LIMIT
+  const capped = !results.direct && !more && repositories.length < results.total
 
   const refresh = async (signal = lifetime.current.signal): Promise<void> => {
     const [policy, inventory] = await Promise.all([props.policy(), props.list()])
@@ -185,16 +187,31 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
       if (alive()) setPending(undefined)
     }
   }
-  const search = (text: string, order: GitHubSort): void => {
+  const loaded = (request: GitHubQuery, found: GitHubSearch): void => {
+    setResults({ ...request, ...found })
+    // Topic choices come from the unfiltered results, so they stay put while one topic is selected.
+    if (request.topic === undefined) setTopics(popularTopics(found.repositories))
+  }
+  const search = (text: string, order: GitHubSort, filter?: string): void => {
     void work('search', async () => {
-      const items = await discoverGitHub(text, order, deadline(SEARCH_MS), props.backendUrl)
+      const request = { query: text, sort: order, topic: filter, page: 1 }
+      const found = await discoverGitHub(request, deadline(SEARCH_MS), props.backendUrl)
       if (!alive()) return
-      setRepositories(items)
-      setSubmitted(text)
-      setSort(order)
+      loaded(request, found)
       setSearched(true)
-      setTopic(current => current !== undefined && items.some(repository => repository.topics.includes(current)) ? current : undefined)
       setView({ kind: 'list' })
+    })
+  }
+  const loadMore = (): void => {
+    void work('more', async () => {
+      const request = { query: results.query, sort, topic, page: results.page + 1 }
+      const found = await discoverGitHub(request, deadline(SEARCH_MS), props.backendUrl)
+      if (!alive()) return
+      const seen = new Set(repositories.map(repository => repository.name + '/' + repository.directory))
+      loaded(request, {
+        ...found,
+        repositories: [...repositories, ...found.repositories.filter(repository => !seen.has(repository.name + '/' + repository.directory))],
+      })
     })
   }
 
@@ -202,10 +219,11 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
     const controller = new AbortController()
     lifetime.current = controller
     setPending('search')
+    const request: GitHubQuery = { query: '', sort: 'updated', topic: undefined, page: 1 }
     void Promise.all([
       refresh(controller.signal),
-      discoverGitHub('', 'updated', AbortSignal.any([controller.signal, AbortSignal.timeout(SEARCH_MS)]), props.backendUrl).then((items) => {
-        if (!controller.signal.aborted) setRepositories(items)
+      discoverGitHub(request, AbortSignal.any([controller.signal, AbortSignal.timeout(SEARCH_MS)]), props.backendUrl).then((found) => {
+        if (!controller.signal.aborted) loaded(request, found)
       }),
     ])
       .catch((error: unknown) => {
@@ -371,7 +389,7 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
     <section className={css.section} aria-labelledby="community-repositories">
       <div className={css.sectionHead}>
         <h2 id="community-repositories">{t('repositories')}</h2>
-        {repositories.length > 0 && <span className={css.count}>{shown.length}</span>}
+        {repositories.length > 0 && <span className={css.count}>{results.total.toLocaleString('en-US')}</span>}
         <SegmentedControl
           id={sortId}
           className={css.sort}
@@ -379,16 +397,17 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
           value={sort}
           disabled={busy}
           options={[{ value: 'updated', label: t('sortUpdated') }, { value: 'stars', label: t('sortStars') }]}
-          onChange={(next) => { search(submitted, next) }}
+          onChange={(next) => { search(results.query, next, topic) }}
         />
       </div>
-      {topics.length > 1 && (
+      {!results.direct && topics.length > 1 && (
         <div className={css.topics} role="group" aria-label={t('topicsLabel')}>
           <Pill
             className={css.topic}
             active={topic === undefined}
             aria-pressed={topic === undefined}
-            onClick={() => { setTopic(undefined) }}
+            disabled={busy}
+            onClick={() => { if (topic !== undefined) search(results.query, sort) }}
           >
             {t('allTopics')}
           </Pill>
@@ -398,7 +417,8 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
               className={css.topic}
               active={topic === item}
               aria-pressed={topic === item}
-              onClick={() => { setTopic(topic === item ? undefined : item) }}
+              disabled={busy}
+              onClick={() => { search(results.query, sort, topic === item ? undefined : item) }}
             >
               {item}
             </Pill>
@@ -414,9 +434,9 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
         {searched && pending !== 'search' && problem === undefined && repositories.length === 0 && (
           <div className={css.empty}><IconSearchOutlineRegular size={20} /><p>{t('noResults')}</p></div>
         )}
-        {pending !== 'search' && shown.length > 0 && (
+        {pending !== 'search' && repositories.length > 0 && (
           <div className={css.grid}>
-            {shown.map((repository) => {
+            {repositories.map((repository) => {
               const key = 'repo:' + repository.name + repository.directory
               const tags = repository.topics.filter(item => item !== 'dsh-plugin').slice(0, 3)
               return (
@@ -453,6 +473,19 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
           </div>
         )}
       </div>
+      {pending !== 'search' && repositories.length > 0 && !results.direct && (
+        <div className={css.pager}>
+          <span className={css.pagerText}>
+            {t('loadedOf', { shown: repositories.length.toLocaleString('en-US'), total: results.total.toLocaleString('en-US') })}
+          </span>
+          {more && (
+            <Button variant="outline" disabled={busy} icon={pending === 'more' ? <Spinner /> : undefined} onClick={loadMore}>
+              {t('loadMore')}
+            </Button>
+          )}
+          {capped && <span className={css.pagerText}>{t('resultCap')}</span>}
+        </div>
+      )}
     </section>
   )
 

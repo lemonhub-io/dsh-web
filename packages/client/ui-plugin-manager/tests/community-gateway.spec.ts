@@ -9,7 +9,7 @@ it('authenticates public package reads and refuses a private repository before r
     const headers = new Headers(init?.headers)
     seen.push({ url, authorization: headers.get('authorization'), accept: headers.get('accept') })
     if (url.endsWith('/repos/owner/private')) return Response.json({ private: true, full_name: 'owner/private' })
-    if (url.includes('/search/repositories')) return Response.json({ items: [
+    if (url.includes('/search/repositories')) return Response.json({ total_count: 30916, items: [
       {
         private: false, full_name: 'owner/public', default_branch: 'main', permissions: { admin: true },
         stargazers_count: 7, pushed_at: '2026-11-01T00:00:00Z', topics: ['dsh-plugin', 'tools'], license: { spdx_id: 'MIT', name: 'MIT License' },
@@ -25,11 +25,15 @@ it('authenticates public package reads and refuses a private repository before r
     headers: { origin: 'https://dsh.openhub.today' },
   })
   try {
-    const found = await worker.fetch(request('search/repositories?q=topic%3Adsh-plugin&sort=stars'), env, context)
+    const found = await worker.fetch(request('search/repositories?q=topic%3Adsh-plugin&sort=stars&per_page=50&page=3'), env, context)
     const search = await found.text()
-    expect((JSON.parse(search) as { items: object[] }).items[0]).toMatchObject({ stargazers_count: 7, pushed_at: '2026-11-01T00:00:00Z', topics: ['dsh-plugin', 'tools'], license: 'MIT' })
-    expect(new URL(seen[0]?.url ?? '').searchParams.get('sort')).toBe('stars')
+    const parsed = JSON.parse(search) as { total_count: number; items: object[] }
+    expect(parsed.total_count).toBe(30916)
+    expect(parsed.items[0]).toMatchObject({ stargazers_count: 7, pushed_at: '2026-11-01T00:00:00Z', topics: ['dsh-plugin', 'tools'], license: 'MIT' })
+    const forwarded = new URL(seen[0]?.url ?? '').searchParams
+    expect([forwarded.get('sort'), forwarded.get('per_page'), forwarded.get('page')]).toEqual(['stars', '50', '3'])
     expect((await worker.fetch(request('search/repositories?q=x&sort=forks'), env, context)).status).toBe(400)
+    expect((await worker.fetch(request('search/repositories?q=x&per_page=50&page=21'), env, context)).status).toBe(400)
     expect(search).not.toContain('owner/private')
     expect(search).not.toContain('permissions')
     expect(search).not.toContain(env.GITHUB_TOKEN)
