@@ -6,7 +6,7 @@ Status: rejected — a separate SDK duplicates the existing Cordis plugin model
 
 ## 问题
 
-[现有社区格式](../../../../apps/web/platform/plugin-community.md) 安装格式版本 1 和 API 编号 1 的隔离 HTML 页面，尚不能提供 Harness 工具、受控会话访问、持久插件数据、事务化更新或逐操作权限。现有检查确认的是声明兼容性，无法证明任意 HTML 符合其宣传的行为。
+[现有社区格式](../../../../apps/web/platform/plugin-community.zh.md) 安装格式版本 1 和 API 编号 1 的隔离 HTML 页面，尚不能提供 Harness 工具、受控会话访问、持久插件数据、事务化更新或逐操作权限。现有检查确认的是声明兼容性，无法证明任意 HTML 符合其宣传的行为。
 
 本提案设计新的格式版本 2，以及独立版本管理的 SDK 1.0 目标。当前安装器尚未实现二者。格式版本 1 保留为能力明确受限的页面格式，现有插件包及授权不会被静默重新解释。
 
@@ -29,7 +29,7 @@ Status: rejected — a separate SDK duplicates the existing Cordis plugin model
 | 界面适配器 | 原生插槽注册和经过校验的声明式视图 |
 | Harness 适配器 | 现有工具、命令、技能和会话扩展点及持久日志 |
 
-受信任应用将这些服务挂载为 Cordis 插件，注册归属 effect，并在销毁时撤销。第三方插件只获得 SDK 代理，不获得 Context 或宿主服务实例。社区界面只是服务消费者，页面是否显示不决定运行时寿命。现有的 [受信任客户端加载](../../implemented/architecture/2026-07-23-client-plugin-loading-model.md)、[registry bundle 更新](../../implemented/architecture/2026-10-14-registry-bundle-updates.md) 和 [Worker profile 组合](../../implemented/architecture/2026-10-14-webworker-preview-profile-parity.md) 保留各自决策，本提案增加第三方信任模型，不替代这些机制。
+受信任应用将这些服务挂载为 Cordis 插件，注册归属 effect，并在销毁时撤销。第三方插件只获得 SDK 代理，不获得 Context 或宿主服务实例。社区界面只是服务消费者，页面是否显示不决定运行时寿命。现有的 [受信任客户端加载](../../implemented/architecture/2026-07-23-client-plugin-loading-model.zh.md)、[registry bundle 更新](../../implemented/architecture/2026-10-14-registry-bundle-updates.zh.md) 和 [Worker profile 组合](../../implemented/architecture/2026-10-14-webworker-preview-profile-parity.zh.md) 保留各自决策，本提案增加第三方信任模型，不替代这些机制。
 
 ```mermaid
 flowchart LR

@@ -58,7 +58,7 @@ pnpm dsh web
 ```sh
 pnpm install
 pnpm run build:lib
-pnpm --filter @deepseek-ai/dsh-web-frontend run build:site  # 输出到 apps/web/dist-site
+pnpm --filter @deepseek-ai/dsh-web-frontend run build:site  # writes apps/web/dist-site
 ```
 
 把 `apps/web/dist-site` 部署到任意 HTTPS 静态托管即可。限制和内部实现见[运行时 README](packages/experimental/webworker-runtime/README.zh.md#known-limitations-and-deferred-work)。
