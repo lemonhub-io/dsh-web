@@ -25,4 +25,4 @@ Service worker 中的每个文件都绑定了内容哈希。新版本只下载�
 
 DSH Web 仅使用 API Key。Worker 镜像禁用账号登录、账号设置和账号模型路由；侧栏保留设置，首次使用的模型配置直接打开 API Key 编辑器。
 
-Worker 提供 `https://dsh-web.mzhub.workers.dev`。要让 `dsh.openhub.today` 使用同一个部署，请使用具有 `openhub.today` Workers Routes Write 权限的凭据，将 `dsh.openhub.today/*` 路由绑定到 `dsh-web`。现有 DNS 记录保留。移除路由即可恢复通过隧道转发到 `127.0.0.1:3092` 的 Caddy。`dsh.daum.pw` 跳转到 `dsh.openhub.today`。
+线上站点是 `https://dsh.openhub.today`。`dsh.openhub.today/*` 路由指向 `dsh-web` Worker。更改路由需要 `openhub.today` 的 Workers Routes Write 权限。现有 DNS 记录保留。移除路由即可恢复通过隧道转发到 `127.0.0.1:3092` 的 Caddy。`dsh.daum.pw` 跳转到 `dsh.openhub.today`。

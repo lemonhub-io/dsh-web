@@ -25,4 +25,4 @@ To refresh the screenshots in the install dialog, run `pnpm exec tsx scripts/cap
 
 DSH Web uses API keys only. Account login, account settings, and the account model route are disabled in the Worker image; the sidebar keeps Settings, and first-use model setup opens the API-key editor directly.
 
-The Worker serves `https://dsh-web.mzhub.workers.dev`. To serve the same deployment on `dsh.openhub.today`, bind the `dsh.openhub.today/*` route to `dsh-web` using a credential with Workers Routes Write on `openhub.today`. The existing DNS record stays in place. Removing the route restores the tunnel to Caddy on `127.0.0.1:3092`. The address `dsh.daum.pw` redirects to `dsh.openhub.today`.
+The live site is `https://dsh.openhub.today`. The `dsh.openhub.today/*` route points to the `dsh-web` Worker. Changing the route requires Workers Routes Write on `openhub.today`. The existing DNS record stays in place. Removing the route restores the tunnel to Caddy on `127.0.0.1:3092`. The address `dsh.daum.pw` redirects to `dsh.openhub.today`.

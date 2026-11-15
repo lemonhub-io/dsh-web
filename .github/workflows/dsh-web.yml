@@ -92,6 +92,6 @@ jobs:
       - name: Confirm the live version
         run: |
           expected=$(grep -o "const VERSION = '[^']*'" apps/web/dist-site/sw.js)
-          live=$(curl -fsS "https://dsh-web.mzhub.workers.dev/sw.js?ci=${GITHUB_SHA}" | grep -o "const VERSION = '[^']*'")
+          live=$(curl -fsS "https://dsh.openhub.today/sw.js?ci=${GITHUB_SHA}" | grep -o "const VERSION = '[^']*'")
           test -n "$expected" && test "$live" = "$expected"
           echo "live: $expected"
