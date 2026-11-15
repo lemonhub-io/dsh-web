@@ -38,57 +38,27 @@
   row-gap: 12px;
   align-items: center;
   justify-content: center;
-  /* Display size for the one home headline; the title text itself is set in
-     the brand face below. */
-  font-size: 32px;
-  line-height: 40px;
-  font-weight: 400;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 500;
   color: var(--dsw-alias-label-primary);
-  animation: hero-rise 760ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: hero-enter 480ms cubic-bezier(0.2, 0, 0, 1) backwards;
 }
 
-/* Headline text: the brand face, inked with the brand gradient clipped to
-   the glyphs (primary ink at the start, accent at the end), so the first
-   word keeps full text contrast in both themes. */
-.title {
-  font-family: var(--dsw-font-family-brand);
-  letter-spacing: -0.01em;
-  background: var(--dsw-gradient-brand-ink);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  /* Descenders stay inside the clipped paint box. */
-  padding-bottom: 2px;
-}
-
-@keyframes hero-rise {
+/* Entrance each time the hero shows: the headline rises 6px into place, and
+   the workspace row and composer below follow 60ms apart (their delays live
+   with their own modules). Opacity and transform only, filled backwards so
+   no transform lingers after the run. */
+@keyframes hero-enter {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(6px);
   }
 }
 
-@keyframes hero-mark-bob {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-3px);
-  }
-}
-
-@keyframes hero-halo-breathe {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(0.92);
-  }
-
-  50% {
-    opacity: 0.9;
-    transform: scale(1.08);
+@media (prefers-reduced-motion: reduce) {
+  .headline {
+    animation: none;
   }
 }
 
@@ -109,13 +79,13 @@
 
 .previewBadge {
   align-self: flex-start;
-  margin-top: 4px;
+  margin-top: 2px;
   padding: 1px 7px 0;
-  border: 0.5px solid var(--dsw-alias-accent-glow);
+  border: 0.5px solid var(--dsw-alias-border-l3);
   border-radius: 999px;
   corner-shape: round;
-  background: var(--dsw-alias-accent-soft);
-  color: var(--dsw-alias-accent);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
   font-family: var(--ds-font-family-code);
   font-size: 12px;
   line-height: 18px;
@@ -126,26 +96,10 @@
 /* Keep hover detection on a stationary box while the mark moves within it;
    hover rules target the hitbox so a slot-occupant mark swims too. */
 .fishHitbox {
-  position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  animation: hero-mark-bob 5.6s ease-in-out 800ms infinite;
-}
-
-/* A breathing accent halo behind the mark. */
-.fishHitbox::before {
-  content: '';
-  position: absolute;
-  inset: -14px -16px;
-  z-index: -1;
-  border-radius: 50%;
-  corner-shape: round;
-  background: radial-gradient(closest-side, var(--dsw-alias-accent-glow), transparent);
-  filter: blur(6px);
-  pointer-events: none;
-  animation: hero-halo-breathe 5.6s ease-in-out 800ms infinite;
 }
 
 /* The swim morph's curves poke slightly past the viewBox edges, so clipping
@@ -155,16 +109,7 @@
   display: block;
   overflow: visible;
   transform-origin: 50% 60%;
-  color: var(--dsw-alias-accent);
-}
-
-/* Gradient stops for the fallback mark's fill. */
-.fishStopStart {
-  stop-color: var(--dsw-static-abyss-blue);
-}
-
-.fishStopEnd {
-  stop-color: var(--dsw-static-abyss-cyan);
+  color: var(--dsw-alias-label-primary);
 }
 
 /* Hover swim: a slow continuous sway about the body center — the head
@@ -189,14 +134,6 @@
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .fishHitbox:hover .fish {
     animation: hero-fish-swim 1.6s ease-in-out infinite;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .headline,
-  .fishHitbox,
-  .fishHitbox::before {
-    animation: none;
   }
 }
 

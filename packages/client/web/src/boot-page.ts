@@ -8,10 +8,8 @@ import type { LoaderEntryState } from './loader-status.ts'
 import css from './boot-page.module.css'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
-/** Rising motes in the scene; fixed so the page and its handoff copy match. */
-const MOTE_COUNT = 18
-/** Longest dissolve animation plus its delay; the copy is removed by then at the latest. */
-const OUTRO_MS = 1400
+/** Longest fade-out animation plus its delay and a margin; the copy is removed by then at the latest. */
+const OUTRO_MS = 700
 /** Frames to wait for the renderer to replace the page before dissolving anyway (about 8s at 60Hz). */
 const HANDOFF_WAIT_FRAMES = 480
 
@@ -30,56 +28,17 @@ function svg(tag: string, attributes: Readonly<Record<string, string>>): SVGElem
   return el
 }
 
-/**
- * Build the decorative scene: drifting washes, light shafts and rising
- * motes. Mote lanes come from a fixed sequence, not randomness, so every
- * boot draws the same water.
- */
-function scene(): HTMLDivElement {
-  const root = div(css.scene)
-  root.setAttribute('aria-hidden', 'true')
-  const motes = div(css.motes)
-  let seed = 7
-  const next = (): number => {
-    seed = (seed * 9301 + 49297) % 233280
-    return seed / 233280
-  }
-  for (let index = 0; index < MOTE_COUNT; index += 1) {
-    const mote = document.createElement('i')
-    mote.className = css.mote ?? ''
-    mote.style.setProperty('--x', `${(4 + next() * 92).toFixed(1)}%`)
-    mote.style.setProperty('--s', `${(2 + next() * 3).toFixed(1)}px`)
-    mote.style.setProperty('--d', `${(9 + next() * 10).toFixed(1)}s`)
-    mote.style.setProperty('--delay', `${(-next() * 18).toFixed(1)}s`)
-    mote.style.setProperty('--drift', `${((next() - 0.5) * 80).toFixed(0)}px`)
-    motes.append(mote)
-  }
-  root.append(div(css.aurora), div(css.rays), motes)
-  return root
-}
-
-/** Build the emblem: halo, three sonar rings and the self-drawing whale. */
-function emblem(): HTMLDivElement {
-  const root = div(css.emblem)
-  root.setAttribute('aria-hidden', 'true')
-  const mark = svg('svg', {
+/** Build the self-drawing whale: an outline path that draws itself over a fill path that fades in. */
+function mark(): SVGElement {
+  const root = svg('svg', {
     class: css.mark ?? '',
     viewBox: `0 0 ${String(FISH_LOGO_VIEWBOX.width)} ${String(FISH_LOGO_VIEWBOX.height)}`,
+    'aria-hidden': 'true',
   })
-  const defs = svg('defs', {})
-  const gradient = svg('linearGradient', { id: 'dsh-boot-whale', x1: '0', y1: '0', x2: '1', y2: '1' })
-  gradient.append(
-    svg('stop', { offset: '0', class: css.stopA ?? '' }),
-    svg('stop', { offset: '0.55', class: css.stopB ?? '' }),
-    svg('stop', { offset: '1', class: css.stopC ?? '' }),
-  )
-  defs.append(gradient)
-  mark.append(
-    defs,
-    svg('path', { d: FISH_LOGO_PATH, class: css.markFill ?? '', fill: 'url(#dsh-boot-whale)' }),
+  root.append(
+    svg('path', { d: FISH_LOGO_PATH, class: css.markFill ?? '' }),
     svg('path', { d: FISH_LOGO_PATH, class: css.markStroke ?? '', pathLength: '1' }),
   )
-  root.append(div(css.halo), div(css.ring), div(css.ring), div(css.ring), mark)
   return root
 }
 
@@ -94,7 +53,7 @@ interface Outro {
 export class BootPage {
   private readonly root: HTMLDivElement
   private readonly card: HTMLDivElement
-  private readonly emblem: HTMLDivElement
+  private readonly mark: SVGElement
   private readonly wordmark: HTMLDivElement
   private readonly status: HTMLDivElement
   private readonly progress: HTMLDivElement
@@ -112,7 +71,7 @@ export class BootPage {
     this.root = div(css.boot)
     this.root.dataset.dshBoot = ''
     this.card = div(css.card)
-    this.emblem = emblem()
+    this.mark = mark()
     this.wordmark = div(css.wordmark, 'DSH')
     this.status = div(css.status)
     this.progress = div(css.progress)
@@ -122,8 +81,8 @@ export class BootPage {
     const hint = div(css.hint, 'Loading plugins…')
     this.progress.setAttribute('aria-label', hint.textContent ?? '')
     this.status.append(hint, this.progress)
-    this.card.append(this.emblem, this.wordmark, this.status)
-    this.root.append(scene(), this.card)
+    this.card.append(this.mark, this.wordmark, this.status)
+    this.root.append(this.card)
     container.append(this.root)
     this.updateProgress()
   }
@@ -159,12 +118,12 @@ export class BootPage {
   }
 
   /**
-   * Dissolve the page into the application the renderer is mounting. A copy
+   * Fade the page out over the application the renderer is mounting. A copy
    * of the page is laid over the document, so the original stays in the
    * mount point for the renderer's hydration handoff. The copy holds still
    * until the renderer has replaced the original (or a frame budget runs
    * out), waits one more frame so the application paints beneath it, then
-   * plays its dissolve and is removed when that ends. Hidden documents run
+   * plays its fade-out and is removed when that ends. Hidden documents run
    * no frames, so a backgrounded boot dissolves when it is shown again. The
    * copy takes no pointer events.
    */
@@ -212,8 +171,7 @@ export class BootPage {
     const failed = [...this.states].filter(([, state]) => state === 'failed').map(([id]) => id)
     if (this.failure === undefined && failed.length === 0) {
       if (this.status.parentElement !== this.card) {
-        delete this.root.dataset.failed
-        this.card.replaceChildren(this.emblem, this.wordmark, this.status)
+        this.card.replaceChildren(this.mark, this.wordmark, this.status)
       }
       return
     }
@@ -221,8 +179,7 @@ export class BootPage {
     report.append(div(css.failedTitle, 'Failed to load plugins'))
     for (const id of failed) report.append(div(css.failedItem, id))
     if (this.failure !== undefined) report.append(div(css.failedItem, this.failure))
-    this.root.dataset.failed = ''
-    this.card.replaceChildren(this.emblem, this.wordmark, report)
+    this.card.replaceChildren(this.mark, this.wordmark, report)
   }
 
   /** Grow the bar monotonically as loader entries activate; the mount completes it. */

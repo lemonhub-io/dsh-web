@@ -2,10 +2,6 @@
    font-weight: 500 in this UI — non-variable webfonts snap intermediate
    weights unpredictably across platforms. */
 body {
-  --dsw-static-abyss-blue: rgb(57, 100, 254);
-  --dsw-static-abyss-azure: rgb(57, 142, 254);
-  --dsw-static-abyss-cyan: rgb(109, 204, 255);
-  --dsw-static-abyss-violet: rgb(139, 118, 246);
   --dsw-static-amber-100: rgb(254, 245, 231);
   --dsw-static-amber-400: rgb(247, 173, 49);
   --dsw-static-amber-500: rgb(245, 158, 11);
@@ -70,7 +66,6 @@ body {
   --dsw-static-neutral-bluish-55: rgb(245, 247, 250);
   --dsw-static-neutral-bluish-600: rgb(129, 133, 140);
   --dsw-static-neutral-bluish-60: rgb(245, 246, 247);
-  --dsw-static-neutral-bluish-65: rgb(242, 245, 250);
   --dsw-static-neutral-bluish-700: rgb(97, 102, 107);
   --dsw-static-neutral-bluish-750: rgb(67, 69, 74);
   --dsw-static-neutral-bluish-75: rgb(241, 243, 245);
@@ -93,12 +88,6 @@ body {
 }
 
 body[data-ds-dark-theme] {
-  /* Abyssal dark: the bluish surface steps carry a navy cast so every layer
-     reads as deep water rather than neutral grey. */
-  --dsw-static-abyss-blue: rgb(57, 100, 254);
-  --dsw-static-abyss-azure: rgb(57, 142, 254);
-  --dsw-static-abyss-cyan: rgb(109, 204, 255);
-  --dsw-static-abyss-violet: rgb(139, 118, 246);
   --dsw-static-amber-100: rgb(254, 245, 231);
   --dsw-static-amber-400: rgb(247, 173, 49);
   --dsw-static-amber-500: rgb(245, 158, 11);
@@ -163,16 +152,15 @@ body[data-ds-dark-theme] {
   --dsw-static-neutral-bluish-55: rgb(245, 247, 250);
   --dsw-static-neutral-bluish-600: rgb(129, 133, 140);
   --dsw-static-neutral-bluish-60: rgb(249, 250, 251);
-  --dsw-static-neutral-bluish-65: rgb(242, 245, 250);
   --dsw-static-neutral-bluish-700: rgb(97, 102, 107);
-  --dsw-static-neutral-bluish-750: rgb(45, 51, 66);
+  --dsw-static-neutral-bluish-750: rgb(67, 69, 74);
   --dsw-static-neutral-bluish-75: rgb(241, 243, 245);
-  --dsw-static-neutral-bluish-800: rgb(32, 37, 49);
-  --dsw-static-neutral-bluish-850: rgb(24, 28, 38);
-  --dsw-static-neutral-bluish-875: rgb(19, 23, 31);
-  --dsw-static-neutral-bluish-900: rgb(8, 10, 15);
+  --dsw-static-neutral-bluish-800: rgb(53, 54, 56);
+  --dsw-static-neutral-bluish-850: rgb(44, 44, 46);
+  --dsw-static-neutral-bluish-875: rgb(35, 35, 36);
+  --dsw-static-neutral-bluish-900: rgb(27, 27, 28);
   --dsw-static-neutral-bluish-90: rgb(237, 240, 244);
-  --dsw-static-neutral-bluish-950: rgb(13, 16, 23);
+  --dsw-static-neutral-bluish-950: rgb(21, 21, 23);
   --dsw-static-red-100: rgb(254, 226, 226);
   --dsw-static-red-400: rgb(242, 90, 90);
   --dsw-static-red-400-a12: rgb(242 90 90 / 12%);
@@ -187,16 +175,6 @@ body[data-ds-dark-theme] {
 
 body {
   --dsw-alias-bg-base: var(--dsw-static-neutral-bluish-00);
-  /* Accent: the abyss blue that marks focus, selection, and brand moments.
-     The canvas is the ground the floating content panel and sidebar sit on;
-     the aurora trio tints ambient decoration only, never text. */
-  --dsw-alias-accent: var(--dsw-static-abyss-blue);
-  --dsw-alias-accent-soft: color-mix(in srgb, var(--dsw-alias-accent) 9%, transparent);
-  --dsw-alias-accent-glow: color-mix(in srgb, var(--dsw-alias-accent) 26%, transparent);
-  --dsw-alias-canvas: var(--dsw-static-neutral-bluish-65);
-  --dsw-alias-aurora-a: color-mix(in srgb, var(--dsw-static-abyss-blue) 15%, transparent);
-  --dsw-alias-aurora-b: color-mix(in srgb, var(--dsw-static-abyss-cyan) 24%, transparent);
-  --dsw-alias-aurora-c: color-mix(in srgb, var(--dsw-static-abyss-violet) 13%, transparent);
   --dsw-alias-bg-document-preview: var(--dsw-static-neutral-bluish-100);
   --dsw-alias-bg-document-selection: color-mix(in srgb, var(--dsw-static-blue-500) 40%, transparent);
   --dsw-alias-label-document-preview: var(--dsw-static-neutral-bluish-700);
@@ -311,7 +289,7 @@ body {
   --dsw-alias-menu-group-header-fill: rgba(248, 249, 250, 0.94);
   --dsw-specific-menu: var(--dsw-menu-surface-fill);
   --dsw-specific-selector: var(--dsw-static-neutral-bluish-60);
-  --dsw-specific-sidebar-fill: var(--dsw-alias-canvas);
+  --dsw-specific-sidebar-fill: var(--dsw-static-neutral-bluish-50);
   --dsw-specific-sidebar-nav-item-active-accent: var(--dsw-static-deepseek-100);
   --dsw-specific-sidebar-nav-item-active: var(--dsw-static-neutral-bluish-100);
   --dsw-specific-tip: var(--dsw-static-neutral-bluish-60);
@@ -321,13 +299,6 @@ body {
 
 body[data-ds-dark-theme] {
   --dsw-alias-bg-base: var(--dsw-static-neutral-bluish-950);
-  --dsw-alias-accent: var(--dsw-static-deepseek-400);
-  --dsw-alias-accent-soft: color-mix(in srgb, var(--dsw-alias-accent) 13%, transparent);
-  --dsw-alias-accent-glow: color-mix(in srgb, var(--dsw-alias-accent) 34%, transparent);
-  --dsw-alias-canvas: var(--dsw-static-neutral-bluish-900);
-  --dsw-alias-aurora-a: color-mix(in srgb, var(--dsw-static-abyss-blue) 30%, transparent);
-  --dsw-alias-aurora-b: color-mix(in srgb, var(--dsw-static-abyss-cyan) 13%, transparent);
-  --dsw-alias-aurora-c: color-mix(in srgb, var(--dsw-static-abyss-violet) 22%, transparent);
   --dsw-alias-bg-document-preview: var(--dsw-static-neutral-bluish-950);
   --dsw-alias-bg-document-selection: color-mix(in srgb, var(--dsw-static-blue-500) 40%, transparent);
   --dsw-alias-label-document-preview: var(--dsw-static-neutral-bluish-300);
@@ -340,7 +311,7 @@ body[data-ds-dark-theme] {
   --dsw-alias-bg-mask-photo: rgba(0, 0, 0, 0.88);
   --dsw-alias-bg-mask-drop: rgba(39, 39, 48, 0.7);
   --dsw-alias-bg-module-platform: var(--dsw-static-neutral-bluish-800);
-  --dsw-alias-bg-multi-select: var(--dsw-static-neutral-bluish-850);
+  --dsw-alias-bg-multi-select: var(--dsw-static-neutral-850);
   --dsw-alias-bg-overlay: var(--dsw-static-neutral-bluish-700);
   --dsw-alias-bg-skeleton: rgba(255, 255, 255, 0.08);
   --dsw-alias-border-inverted2: rgba(255, 255, 255, 0.08);
@@ -399,7 +370,7 @@ body[data-ds-dark-theme] {
   --dsw-alias-markdown-code-block: var(--dsw-static-neutral-bluish-900);
   --dsw-alias-markdown-code-segment-selected: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-markdown-code-segment-unselected: var(--dsw-static-neutral-bluish-900);
-  --dsw-alias-markdown-inline-code: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-markdown-inline-code: var(--dsw-static-neutral-800);
   --dsw-alias-markdown-placeholder: var(--dsw-static-neutral-bluish-850);
   --dsw-alias-markdown-tag: var(--dsw-static-neutral-bluish-850);
   --dsw-alias-scrollbar-bg-l1: var(--dsw-static-neutral-700);
@@ -435,11 +406,11 @@ body[data-ds-dark-theme] {
   --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-750);
   --dsw-alias-tooltip-key-bg: color-mix(in srgb, var(--dsw-alias-tooltip-bg), white 18%);
   --dsw-specific-bubble-highlight: var(--dsw-static-neutral-bluish-750);
-  --dsw-specific-bubble: color-mix(in srgb, var(--dsw-static-abyss-blue) 14%, var(--dsw-static-neutral-bluish-850));
+  --dsw-specific-bubble: var(--dsw-static-neutral-bluish-850);
   --dsw-specific-input-major: var(--dsw-static-neutral-bluish-850);
   --dsw-specific-login-input: var(--dsw-static-neutral-bluish-900);
-  --dsw-menu-surface-fill: rgba(30, 35, 48, 0.72);
-  --dsw-alias-menu-group-header-fill: rgba(30, 35, 48, 0.94);
+  --dsw-menu-surface-fill: rgba(48, 49, 54, 0.64);
+  --dsw-alias-menu-group-header-fill: rgba(48, 49, 54, 0.94);
   --dsw-specific-menu: var(--dsw-menu-surface-fill);
   --dsw-specific-selector: var(--dsw-static-neutral-bluish-800);
   --dsw-specific-sidebar-fill: var(--dsw-static-neutral-bluish-900);

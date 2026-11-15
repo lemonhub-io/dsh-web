@@ -83,14 +83,15 @@
 }
 
 /* Browser build (no desktop platform mark), side-by-side layout: the frame
-   and sidebar share the canvas and the centre column floats on it as one
-   rounded, elevated panel, inset from the window edges. A docked right track
+   takes the sidebar fill as its canvas and the centre column floats on it as
+   one rounded panel with the hairline panel elevation, inset from the window
+   edges. A docked right track
    turns the panel back into a flush split so the occupant's own left border
    joins the centre edge to edge; the drawer layout stays full-bleed. Margin,
    radius and shadow ride the track curve while data-animating is up. */
 :global(html:not([data-platform])) .frame:not([data-sidebar-drawer]) {
   --dsh-frame-panel-inset: 8px;
-  background: var(--dsw-alias-canvas);
+  background: var(--dsw-specific-sidebar-fill);
 }
 
 :global(html:not([data-platform])) .frame:not([data-sidebar-drawer]) .sidebarCol {
@@ -118,27 +119,27 @@
     box-shadow var(--ds-transition-duration-slow) var(--ds-ease-in-out);
 }
 
-/* First paint after the boot handoff: the panel rises into place while the
-   sidebar content fades in beside it. */
+/* First paint after the boot handoff: the sidebar content fades in and the
+   panel follows 60ms later, rising 4px. Opacity and transform only, filled
+   backwards so no transform outlives the run. */
 :global(html:not([data-platform])) .frame:not([data-sidebar-drawer]) .centerCol {
-  animation: frame-panel-in 640ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: frame-panel-in 420ms cubic-bezier(0.2, 0, 0, 1) 60ms backwards;
 }
 
 .sidebarCol > * {
-  animation: frame-sidebar-in 520ms cubic-bezier(0.22, 1, 0.36, 1) 80ms backwards;
+  animation: frame-sidebar-in 360ms cubic-bezier(0.2, 0, 0, 1) backwards;
 }
 
 @keyframes frame-panel-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.985);
+    transform: translateY(4px);
   }
 }
 
 @keyframes frame-sidebar-in {
   from {
     opacity: 0;
-    transform: translateX(-8px);
   }
 }
 

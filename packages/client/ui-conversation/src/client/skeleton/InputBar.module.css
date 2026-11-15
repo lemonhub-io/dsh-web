@@ -91,79 +91,33 @@
   }
 }
 
-/* Focus rim: a 1px conic brand gradient masked to the card's edge ring. It
-   fades in while the draft has focus and slowly turns its hue around the
-   card; the card adds a low accent glow below. The rim takes no pointer
-   events and paints only the ring, so it never covers the draft. */
-@property --dsh-composer-rim-angle {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
-
-.card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  box-sizing: border-box;
-  padding: 1px;
-  border-radius: inherit;
-  background: conic-gradient(
-    from var(--dsh-composer-rim-angle),
-    var(--dsw-static-abyss-blue),
-    var(--dsw-static-abyss-cyan),
-    var(--dsw-static-abyss-violet),
-    var(--dsw-static-abyss-azure),
-    var(--dsw-static-abyss-blue)
-  );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity var(--ds-transition-duration-slow) var(--ds-ease-in-out);
-  pointer-events: none;
-}
-
-.card:focus-within::before {
-  opacity: 0.9;
-  animation: composer-rim-turn 8s linear infinite;
-}
-
+/* Focus darkens the hairline one step; the shadow eases between the two
+   strokes. */
 .card {
-  box-shadow: var(--dsw-elevation-soft), 0 12px 32px -14px var(--dsh-composer-glow, transparent);
-  transition: box-shadow var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  transition: box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
 }
 
-/* Focus swaps the neutral hairline for the rim and lights the glow below. */
 .card:focus-within {
-  --dsh-composer-glow: var(--dsw-alias-accent-glow);
-  --dsw-elevation-stroke-color: transparent;
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l4);
 }
 
-/* The workspace-picker state keeps its dashed outline instead of the rim. */
-.cardWorkspaceTrigger::before {
-  display: none;
-}
-
-@keyframes composer-rim-turn {
-  to { --dsh-composer-rim-angle: 360deg; }
-}
-
-/* Hero entrance: the card rises just after the headline. */
+/* Last step of the hero entrance (HeroShell.module.css owns the first). */
 .hero .card {
-  animation: composer-rise 760ms cubic-bezier(0.22, 1, 0.36, 1) 160ms backwards;
+  animation: composer-enter 480ms cubic-bezier(0.2, 0, 0, 1) 120ms backwards;
 }
 
-@keyframes composer-rise {
+@keyframes composer-enter {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.99);
+    transform: translateY(6px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card:focus-within::before,
+  .card {
+    transition: none;
+  }
+
   .hero .card {
     animation: none;
   }
@@ -470,8 +424,9 @@
   cursor: default;
 }
 
-/* Primary send (figma IconButton 34:10465): 34px circle in the brand
-   gradient, NOT button-primary (ink); white glyph; empty text = 0.4 opacity. */
+/* Primary send (figma IconButton 34:10465): 34px circle, #3964FE light /
+   #679EFE dark — the info-fill pair (500→400), NOT button-primary (ink);
+   white glyph; empty text = 0.4 opacity. */
 .primary {
   display: grid;
   place-items: center;
@@ -481,18 +436,14 @@
   border: none;
   border-radius: 999px;
   corner-shape: round;
-  /* The brand gradient with an accent glow beneath; the fill stays blue in
-     both themes. */
-  background: var(--dsw-gradient-brand);
-  box-shadow: 0 4px 14px -4px var(--dsw-alias-accent-glow);
-  /* Static white, not the foreground token: the arrow stays white on the blue
-     fill in both themes (design 34:10465). */
-  color: #fff;
+  /* Inverted ink: a black circle with a white arrow in light, the reverse in
+     dark. */
+  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-bg-base);
   cursor: pointer;
   transition:
-    filter 100ms ease,
-    box-shadow var(--ds-transition-duration) var(--ds-ease-in-out),
-    opacity var(--ds-transition-duration) var(--ds-ease-in-out);
+    opacity var(--ds-transition-duration) var(--ds-ease-in-out),
+    transform var(--ds-transition-duration-fast) var(--ds-ease-in-out);
   /* Opts out of the row's 2px downward shift (.row top pad): the send circle
      keeps its original seat while the smaller chips sit lower. Transform, not
      margin, so flex centering math is untouched. */
@@ -506,14 +457,16 @@
 
 @media (hover: hover) {
   .primary:hover:not(:disabled) {
-    filter: brightness(1.08) saturate(1.1);
-    box-shadow: 0 6px 20px -4px var(--dsw-alias-accent-glow);
+    opacity: 0.82;
   }
 }
 
+.primary:active:not(:disabled) {
+  transform: translateY(-2px) scale(0.92);
+}
+
 .primary:disabled {
-  opacity: 0.4;
-  box-shadow: none;
+  opacity: 0.18;
   cursor: default;
 }
 
