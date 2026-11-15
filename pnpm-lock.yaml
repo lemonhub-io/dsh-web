@@ -2277,8 +2277,8 @@ importers:
         specifier: ^7.8.0
         version: 7.8.0
       chokidar:
-        specifier: ^4.0.3
-        version: 4.0.3
+        specifier: ^5.0.0
+        version: 5.0.0
 
   packages/boot/plugin-market:
     dependencies:
