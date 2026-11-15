@@ -18,6 +18,8 @@ import { discoverGitHub, downloadGitHubPackage, githubPackages, type GitHubPacka
 
 /** Plain callbacks so the plugin manager keeps ownership of the installed inventory. */
 export interface CommunityFace {
+  /** Public GitHub backend resolved from the plugin configuration. */
+  backendUrl: string
   policy(): Promise<WebPackageLimits | null>
   list(): Promise<BundleInfo[]>
   inspect(encoded: string): Promise<WebBundleInspection>
@@ -128,7 +130,7 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
     setPending('search')
     void Promise.all([
       refresh(controller.signal),
-      discoverGitHub('', AbortSignal.any([controller.signal, AbortSignal.timeout(SEARCH_MS)])).then((items) => {
+      discoverGitHub('', AbortSignal.any([controller.signal, AbortSignal.timeout(SEARCH_MS)]), props.backendUrl).then((items) => {
         if (!controller.signal.aborted) setRepositories(items)
       }),
     ])
@@ -153,7 +155,11 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
       if (alive()) setPending(undefined)
     }
   }
-  const review = async (bytes: Uint8Array, release?: { name: string; version: string; sha256?: string }, origin?: string): Promise<void> => {
+  const review = async (
+    bytes: Uint8Array,
+    release?: { name: string; version: string; sha256?: string },
+    origin?: string,
+  ): Promise<void> => {
     if (limits == null || bytes.length > limits.archiveBytes) { setProblem('size'); return }
     if (release?.sha256 !== undefined && await sha256(bytes) !== release.sha256) { setProblem('integrity'); return }
     const encoded = bytesToBase64(bytes)
@@ -169,7 +175,7 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
   const installGitHub = (pkg: GitHubPackage): void => {
     void work('pkg:' + pkg.name, async () => {
       if (limits == null) return
-      const bytes = await downloadGitHubPackage(pkg, limits, deadline(TRANSFER_MS))
+      const bytes = await downloadGitHubPackage(pkg, limits, deadline(TRANSFER_MS), props.backendUrl)
       await review(bytes, pkg, `${pkg.repository} @ ${pkg.commit.slice(0, 12)}`)
     })
   }
@@ -234,7 +240,7 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
             onSubmit={(event) => {
               event.preventDefault()
               void work('search', async () => {
-                const items = await discoverGitHub(query, deadline(SEARCH_MS))
+                const items = await discoverGitHub(query, deadline(SEARCH_MS), props.backendUrl)
                 if (!alive()) return
                 setRepositories(items)
                 setSearched(true)
@@ -307,7 +313,7 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
                               icon={pending === key ? <Spinner /> : undefined}
                               onClick={() => {
                                 void work(key, async () => {
-                                  const packages = await githubPackages(repository, deadline(INSPECT_MS))
+                                  const packages = await githubPackages(repository, deadline(INSPECT_MS), props.backendUrl)
                                   if (alive()) setView({ kind: 'repository', repository, packages })
                                 })
                               }}
@@ -493,7 +499,9 @@ export function CommunityPage(props: CommunityPageProps): ReactNode {
               : (
                   <>
                     <div className={clsx(css.status, candidate.report.compatible ? css.statusOk : css.statusBad)}>
-                      {candidate.report.compatible ? <IconCheckCircleFillRegular size={18} /> : <IconWarningTriangleOutlineRegular size={18} />}
+                      {candidate.report.compatible
+                      ? <IconCheckCircleFillRegular size={18} />
+                      : <IconWarningTriangleOutlineRegular size={18} />}
                       <p>{candidate.report.compatible ? t('compatible') : t(inspectionFailure(candidate.report.problem))}</p>
                     </div>
                     {candidate.report.compatible && (

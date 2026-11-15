@@ -37,3 +37,22 @@ node --import tsx/esm scripts/pack-web-plugin.ts --src apps/web/plugin-examples/
 使用既有[市场索引格式 1](../../../packages/util/plugin-market-index/README.zh.md)。每个版本保留普通 npm 或固定 Git 提交的 `source`，并可增加 `web: { "url": "hello-1.0.0.tgz", "sha256": "<lowercase SHA-256>" }`。Web 地址相对索引地址解析，除同源开发外必须使用 HTTPS。原生客户端保留原安装来源。[内置索引](../public/plugin-community/cordis/index.json)提供可用 Web 示例，并非已填充的第三方目录。
 
 请求不带凭据且拒绝重定向。社区将索引限制为 512 KiB 与 100 个包，下载期限为 15 秒。检查实际包前，发行版元数据仅供参考。SHA-256 建立与所选索引的一致性，不代表发布者身份。浏览器内不安装 npm 依赖解析器或编译器。
+
+<a id="community-backend"></a>
+## 社区后端
+
+GitHub 发现与源码下载通过独立 Worker `https://dsh-community.openhub.today` 完成。`ui-plugin-manager` 条目支持通过 `communityBackendUrl` 选择其他 HTTPS 后端。Worker 提供只读的公开仓库搜索、元数据、提交、树和 blob 接口 在获取仓库数据前检查仓库可见性 并将搜索结果过滤为公开仓库。仓库响应仅包含发现所需字段 浏览器继续执行提交固定、blob 哈希验证和包检查。
+
+可选的 `GITHUB_TOKEN` secret 在 Worker 内认证上游请求。允许的浏览器来源通过 `ALLOWED_ORIGINS` 配置 默认允许本机开发。可变结果缓存 60 秒 不可变树和 blob 缓存一小时 `CACHE_SECONDS`、`IMMUTABLE_CACHE_SECONDS` 与 `MAX_RESPONSE_BYTES` 配置这些限制。上游额度限制响应会进入社区已有的错误提示。
+
+在仓库外的受保护文件中准备 Cloudflare 凭据、账号及区域标识和 GitHub 凭据后 从仓库根目录部署。部署会更新 Worker secret 并绑定自定义域名 已有绑定指向其他 Worker 时停止部署。
+
+```sh
+(
+  set -a
+  . "$HOME/.config/cloudflare/plugin-community.env"
+  . "$HOME/.config/github/plugin-community.env"
+  set +a
+  node --import tsx/esm packages/client/ui-plugin-manager/gateway/deploy.ts
+)
+```

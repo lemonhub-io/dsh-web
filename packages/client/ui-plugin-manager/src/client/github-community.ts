@@ -36,9 +36,9 @@ function text(value: unknown): string {
   if (typeof value !== 'string') throw new CommunitySourceError('invalid')
   return value
 }
-async function json(path: string, signal: AbortSignal, limit = 1024 * 1024): Promise<unknown> {
+async function json(backend: string, path: string, signal: AbortSignal, limit = 1024 * 1024): Promise<unknown> {
   const bytes = await downloadCommunityBytes(
-    'https://api.github.com/' + path,
+    backend.replace(/\/+$/, '') + '/github/' + path,
     limit,
     signal,
     'application/vnd.github+json',
@@ -64,9 +64,10 @@ function repository(value: unknown): GitHubRepository {
 /** Find tagged repositories or resolve an explicit owner/repository or GitHub tree URL.
  * @param query Search terms or public repository address.
  * @param signal Caller-owned cancellation and deadline.
+ * @param backend Worker backend URL.
  * @returns Up to 24 repositories No credentials or code-search authentication is required.
  */
-export async function discoverGitHub(query: string, signal: AbortSignal): Promise<GitHubRepository[]> {
+export async function discoverGitHub(query: string, signal: AbortSignal, backend: string): Promise<GitHubRepository[]> {
   let target = query
     .trim()
     .replace(/^https:\/\/github\.com\//i, '')
@@ -74,7 +75,7 @@ export async function discoverGitHub(query: string, signal: AbortSignal): Promis
   const direct = /^[\w.-]+\/[\w.-]+(?:\/tree\/[^/]+(?:\/.*)?)?$/.test(target)
   if (direct) {
     const [owner, rawName, , branch, ...directory] = target.split('/')
-    const item = repository(await json(`repos/${owner}/${rawName?.replace(/\.git$/, '')}`, signal))
+    const item = repository(await json(backend, `repos/${owner}/${rawName?.replace(/\.git$/, '')}`, signal))
     const path = directory.map(decodeURIComponent)
     if (path.some(part => !segment.test(part) || part === '.' || part === '..'))
       throw new CommunitySourceError('invalid')
@@ -92,14 +93,14 @@ export async function discoverGitHub(query: string, signal: AbortSignal): Promis
     per_page: '24',
     sort: 'updated',
   })
-  const result = object(await json('search/repositories?' + search.toString(), signal))
+  const result = object(await json(backend, 'search/repositories?' + search.toString(), signal))
   if (!Array.isArray(result.items) || result.items.length > 24) throw new CommunitySourceError('invalid')
   return result.items.map(repository)
 }
 
-async function blob(repo: string, file: GitHubFile, signal: AbortSignal): Promise<Uint8Array> {
+async function blob(backend: string, repo: string, file: GitHubFile, signal: AbortSignal): Promise<Uint8Array> {
   const bytes = await downloadCommunityBytes(
-    `https://api.github.com/repos/${repo}/git/blobs/${file.sha}`,
+    backend.replace(/\/+$/, '') + `/github/repos/${repo}/git/blobs/${file.sha}`,
     file.size,
     signal,
     'application/vnd.github.raw+json',
@@ -118,15 +119,16 @@ async function blob(repo: string, file: GitHubFile, signal: AbortSignal): Promis
 /** Read package manifests from a single commit without evaluating repository code.
  * @param repo Repository selected by discovery.
  * @param signal Caller-owned cancellation and deadline.
+ * @param backend Worker backend URL.
  * @returns Ordinary bundle packages with npm files selection and pinned blob identities.
  */
-export async function githubPackages(repo: GitHubRepository, signal: AbortSignal): Promise<GitHubPackage[]> {
-  const commit = object(await json(`repos/${repo.name}/commits/${encodeURIComponent(repo.branch)}`, signal))
+export async function githubPackages(repo: GitHubRepository, signal: AbortSignal, backend: string): Promise<GitHubPackage[]> {
+  const commit = object(await json(backend, `repos/${repo.name}/commits/${encodeURIComponent(repo.branch)}`, signal))
   const sha = text(commit.sha)
   if (!/^[a-f0-9]{40}$/.test(sha)) throw new CommunitySourceError('invalid')
   const treeId = text(object(object(commit.commit).tree).sha)
   if (!/^[a-f0-9]{40}$/.test(treeId)) throw new CommunitySourceError('invalid')
-  const tree = object(await json(`repos/${repo.name}/git/trees/${treeId}?recursive=1`, signal, 4 * 1024 * 1024))
+  const tree = object(await json(backend, `repos/${repo.name}/git/trees/${treeId}?recursive=1`, signal, 4 * 1024 * 1024))
   if (tree.truncated !== false || !Array.isArray(tree.tree)) throw new CommunitySourceError('size')
   const files: GitHubFile[] = []
   for (const raw of tree.tree) {
@@ -157,7 +159,7 @@ export async function githubPackages(repo: GitHubRepository, signal: AbortSignal
   for (const file of manifests) {
     if (file.size > 256 * 1024 || (file.mode !== '100644' && file.mode !== '100755'))
       throw new CommunitySourceError('invalid')
-    const bytes = await blob(repo.name, file, signal)
+    const bytes = await blob(backend, repo.name, file, signal)
     let raw: unknown
     try {
       raw = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
@@ -205,12 +207,14 @@ export async function githubPackages(repo: GitHubRepository, signal: AbortSignal
  * @param pkg Package selected from one repository commit.
  * @param limits Current host archive policy.
  * @param signal Caller-owned cancellation and deadline.
+ * @param backend Worker backend URL.
  * @returns Gzip npm tar bytes Files are verified against their Git blob hashes before use.
  */
 export async function downloadGitHubPackage(
   pkg: GitHubPackage,
   limits: WebPackageLimits,
   signal: AbortSignal,
+  backend: string,
 ): Promise<Uint8Array> {
   const tarSize = 1024 + pkg.files.reduce((sum, file) => sum + 512 + Math.ceil(file.size / 512) * 512, 0)
   if (pkg.files.length > limits.files || tarSize > limits.expandedBytes) throw new CommunitySourceError('size')
@@ -223,7 +227,7 @@ export async function downloadGitHubPackage(
     const results = await Promise.allSettled(
       batch.map(async file => ({
         header: { name: 'package/' + file.path, size: file.size },
-        body: await blob(pkg.repository, file, signal),
+        body: await blob(backend, pkg.repository, file, signal),
       })),
     )
     for (const result of results) {

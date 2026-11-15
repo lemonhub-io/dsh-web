@@ -36,7 +36,7 @@ export async function downloadCommunityBytes(
   }
   if (!response.ok || response.body === null) {
     await response.body?.cancel()
-    throw new CommunitySourceError(response.status === 404 ? 'missing' : 'network')
+    throw new CommunitySourceError(response.status === 404 ? 'missing' : response.status === 413 ? 'size' : 'network')
   }
   const reader = response.body.getReader()
   const parts: Uint8Array[] = []

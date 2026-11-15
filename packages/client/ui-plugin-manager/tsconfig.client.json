@@ -16,6 +16,9 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../../vendor/schemastery"
+    },
+    {
       "path": "../../api/remotes/tsconfig.client.json"
     },
     {
@@ -60,6 +63,7 @@
   ],
   "include": [
     "src/client",
+    "src/community-config.ts",
     "src/css-modules.d.ts"
   ]
 }

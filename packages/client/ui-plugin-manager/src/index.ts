@@ -4,6 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { communityBackendUrl, type CommunityConfig } from './community-config.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -12,7 +13,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 /** Registry-probe deadline and process-local cache policy. */
-export interface Config {
+export interface Config extends CommunityConfig {
   /** Whether the dialog can compare the public npm registries. */
   registryProbeEnabled: boolean
   /** Deadline for the parallel HTTPS probes, including response cleanup. */
@@ -24,6 +25,7 @@ export interface Config {
 /** Compares public registry responses on the Host; the Client owns the initial selection. */
 export default class PluginRegistryProbe extends TypertRemoteService {
   static Config: z<Partial<Config>, Config> = z.object({
+    communityBackendUrl,
     registryProbeEnabled: z.boolean().default(true),
     registryProbeTimeoutMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(1500),
     registryProbeCacheTtlMs: z.natural().default(300000),

@@ -9,6 +9,8 @@
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
+import { communityBackendUrl, type CommunityConfig } from '../community-config.ts'
 // Type-only: the root `main` keyed slot the page registers into, declared by
 // ui-layout with the panel id brand, and the `sidebar.panellist` list the
 // entry registers into, declared by ui-sidebar.
@@ -86,14 +88,18 @@ export const PANEL_ID = 'plugins' as MainPanelId
 /** Services required by the sidebar registration, the Remote methods, and access; the inventory says whether the Host manages a profile. */
 export const inject = ['slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe', 'configForms', 'layout', 'remoteAccess']
 
+/** Resolve the community backend for this client deployment. */
+export const Config: z<Partial<CommunityConfig>, CommunityConfig> = z.object({ communityBackendUrl })
+
 /**
  * Contribute the Plugins entry to the sidebar with the management page it
  * opens, and keep it current on the Host's change events, while the current
  * Peer may list the installed bundles.
  * @param ctx - the browser plugin context.
+ * @param config - resolved community backend configuration.
  */
-export function apply(ctx: ClientContext): void {
-  ctx.plugin(community)
+export function apply(ctx: ClientContext, config: CommunityConfig = Config({})): void {
+  ctx.plugin(community, config)
   ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-plugin-manager: dictionaries')
   const t = ctx.locale.bind(NS)
   const controller = new PluginManagerController(ctx)

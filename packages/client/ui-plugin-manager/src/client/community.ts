@@ -5,6 +5,7 @@ import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import { CommunityPage, type CommunityFace } from './CommunityPage.tsx'
 import { communityEn, communityZh } from './community-locales.ts'
 import { CommunityPanelIcon } from './CommunityPanelIcon.tsx'
+import type { CommunityConfig } from '../community-config.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -21,14 +22,16 @@ export const inject = ['slots', 'locale', 'layout', 'remote', 'remote.pluginMana
 /**
  * Register the community as a separate main panel and sidebar entry.
  * @param ctx Owning browser plugin context.
+ * @param config Resolved backend URL.
  */
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, config: CommunityConfig): void {
   ctx.effect(() => ctx.locale.register('pluginCommunity', { en: communityEn, zh: communityZh }), 'plugin-community: dictionaries')
   const panel = 'plugin-community' as MainPanelId
   const t = ctx.locale.bind('pluginCommunity')
   const manager = ctx.remote.pluginManager
   const unwrap = <T>(result: RemoteResult<T>): T => { if (!result.ok) throw result.error; return result.value }
   const face: CommunityFace = {
+    backendUrl: config.communityBackendUrl,
     policy: async () => unwrap(await manager.webBundlePolicy()),
     list: async () => unwrap(await manager.listBundles()),
     inspect: async (encoded: string) => unwrap(await manager.inspectWebBundle(encoded)),

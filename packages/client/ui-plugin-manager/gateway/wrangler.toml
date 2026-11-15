@@ -1,0 +1,11 @@
+name = "dsh-plugin-community"
+main = "worker.js"
+compatibility_date = "2026-11-15"
+workers_dev = false
+routes = [{ pattern = "dsh-community.openhub.today", custom_domain = true }]
+
+[vars]
+ALLOWED_ORIGINS = "https://dsh.openhub.today"
+CACHE_SECONDS = "60"
+IMMUTABLE_CACHE_SECONDS = "3600"
+MAX_RESPONSE_BYTES = "33554432"

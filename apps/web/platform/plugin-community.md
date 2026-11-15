@@ -37,3 +37,21 @@ Native addons, uncompiled TypeScript, encrypted or linked archive entries, unsaf
 Use the existing [market index format 1](../../../packages/util/plugin-market-index/README.md). A version keeps its normal npm or pinned Git `source` and can add `web: { "url": "hello-1.0.0.tgz", "sha256": "<lowercase SHA-256>" }`. The Web URL resolves against the index URL and requires HTTPS except same-origin development. Native clients keep their original install source. The [bundled index](../public/plugin-community/cordis/index.json) provides the working Web example; it is not a populated third-party directory.
 
 Requests omit credentials and reject redirects. The community bounds indexes to 512 KiB and 100 packages and uses a 15 second download deadline. Release metadata is advisory until inspection verifies the actual package. SHA-256 establishes consistency with the chosen index, not publisher identity. No npm dependency resolver or TypeScript compiler is installed in the browser.
+
+## Community backend
+
+GitHub discovery and source downloads use the dedicated Worker at `https://dsh-community.openhub.today`. The `ui-plugin-manager` entry accepts `communityBackendUrl` to select another HTTPS backend. The Worker serves read-only public repository search, metadata, commits, trees and blobs. It checks repository visibility before fetching repository data and filters search results to public repositories. Repository responses contain the fields needed for discovery. The browser keeps commit pinning, blob-hash verification and package inspection.
+
+The optional `GITHUB_TOKEN` secret authenticates upstream requests inside the Worker. Allowed browser origins use `ALLOWED_ORIGINS`, with localhost development enabled by default. Mutable results are cached for 60 seconds and immutable trees and blobs for one hour. `CACHE_SECONDS`, `IMMUTABLE_CACHE_SECONDS` and `MAX_RESPONSE_BYTES` configure these limits. Upstream rate-limit responses reach the existing community error display.
+
+Deploy from the repository root after provisioning the Cloudflare credential, account and zone identifiers and the GitHub credential in protected files outside the checkout. The deployment updates the Worker secret and binds its custom domain. An existing binding to a different Worker causes deployment to stop.
+
+```sh
+(
+  set -a
+  . "$HOME/.config/cloudflare/plugin-community.env"
+  . "$HOME/.config/github/plugin-community.env"
+  set +a
+  node --import tsx/esm packages/client/ui-plugin-manager/gateway/deploy.ts
+)
+```

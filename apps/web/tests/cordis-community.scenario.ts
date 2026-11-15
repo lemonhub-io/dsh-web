@@ -61,8 +61,11 @@ export async function cordisCommunityScenario(
       .digest('hex'),
   }))
   let rateLimited = false
-  await context.route('https://api.github.com/**', async (route) => {
+  await context.route('https://dsh-community.openhub.today/github/**', async (route) => {
+    if (route.request().headers().authorization !== undefined)
+      throw new Error('The browser sent credentials to the public community backend')
     const url = new URL(route.request().url())
+    url.pathname = url.pathname.slice('/github'.length)
     let body: object | undefined
     if (url.pathname === '/search/repositories' && url.searchParams.get('q')?.includes('topic:dsh-plugin')) {
       if (rateLimited) {
