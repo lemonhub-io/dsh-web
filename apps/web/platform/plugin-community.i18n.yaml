@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for plugin-community.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write apps/web/platform/plugin-community.md
+/dsh-web-plugin-community:
+  en: 65eb1d0fcc9a7728
+  zh: 8732d95ba84fb11e
+/dsh-web-plugin-community/install-a-plugin:
+  en: af68ad9b375f3038
+  zh: 0086e8768428a205
+/dsh-web-plugin-community/publish-on-github:
+  en: 6c19ecc278cdf88d
+  zh: 83a90b6f2fff00bb
+/dsh-web-plugin-community/prepare-an-ordinary-bundle:
+  en: 3cb64c803598e33c
+  zh: 310d15f806dac05c
+/dsh-web-plugin-community/publish-a-catalog:
+  en: 09fb4c341a427e7b
+  zh: d5b153b87fe7f2ef

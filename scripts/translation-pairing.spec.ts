@@ -386,6 +386,7 @@ describe('translation scope discovery', () => {
     'native/example/README.i18n.yaml',
     '.agents/notes/proposed/feature.md',
     'docs/guide.md',
+    'apps/web/platform/plugin-community.md',
     'python/guide.md',
     'python/sdk-runtime/README.md',
     'python/sdk-runtime/src/deepseek_harness_runtime/README.md',

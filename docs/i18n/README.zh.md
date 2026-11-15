@@ -47,7 +47,7 @@
 
 ## 范围与排除
 
-**范围**：根目录 `CONTRIBUTING.md`、`BRAND_GUIDELINES.md` 与 `SAFETY.md` 文档、除 vendor 源码外的全部 README，以及 `.agents/notes/**`、`docs/**` 与 `python/**` 下的全部活跃文档。匹配 README 时只看文件名且不区分大小写，因此今后新增的目录无需再修改 manifest。依赖目录、被忽略的构建产物目录以及冻结的 `.agents/notes/archived/` 目录树只在发现阶段排除，不属于持续演进的翻译源文档。
+**范围**：根目录 `CONTRIBUTING.md`、`BRAND_GUIDELINES.md` 与 `SAFETY.md` 文档、除 vendor 源码外的全部 README，以及 `.agents/notes/**`、`apps/web/platform/**`、`docs/**` 与 `python/**` 下的全部活跃文档。匹配 README 时只看文件名且不区分大小写，因此今后新增的目录无需再修改 manifest。依赖目录、被忽略的构建产物目录以及冻结的 `.agents/notes/archived/` 目录树只在发现阶段排除，不属于持续演进的翻译源文档。
 
 **范围外**：组合包 `packages/<group>/<package>/docs/` 下由 locale `meta.detail` 指定给插件页的详情文档。插件页只显示当前界面语言对应的文件，因此这些文档不带文档内的语言切换行，也没有一致性记录；[`verify-md-links`](../../scripts/verify-md-links.ts) 与 [`verify-md-wrap`](../../scripts/verify-md-wrap.ts) 仍会检查两种语言，两侧是否同步由评审把关。
 

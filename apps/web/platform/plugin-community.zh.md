@@ -22,7 +22,7 @@ Cordis 插件拥有与内置插件相同的浏览器宿主权限，包括工作�
 
 ## 准备普通组合包
 
-[hello 示例](../plugin-examples/hello/README.md)是普通 Cordis 插件，通过 `ctx.tools.register` 提供 `community_echo`。其 `package.json` 声明既有的 `dsh.bundle.patch`、`engines.dsh` 与 peer 依赖，补丁插入普通包入口。准备 Web 发行文件前先编译 TypeScript 并捆绑私有 npm 依赖，宿主提供的依赖可保留为 peer。
+[hello 示例](../plugin-examples/hello/README.zh.md)是普通 Cordis 插件，通过 `ctx.tools.register` 提供 `community_echo`。其 `package.json` 声明既有的 `dsh.bundle.patch`、`engines.dsh` 与 peer 依赖，补丁插入普通包入口。准备 Web 发行文件前先编译 TypeScript 并捆绑私有 npm 依赖，宿主提供的依赖可保留为 peer。
 
 ```sh
 node --import tsx/esm scripts/pack-web-plugin.ts --src apps/web/plugin-examples/hello --out /tmp/hello-1.0.0.tgz

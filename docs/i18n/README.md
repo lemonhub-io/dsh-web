@@ -45,7 +45,7 @@ The gate's limit, stated plainly: **a green gate means the pair was confirmed co
 
 ## Scope and exclusions
 
-**Scope**: the root `CONTRIBUTING.md`, `BRAND_GUIDELINES.md`, and `SAFETY.md` documents, every non-vendor README, and every active document under `.agents/notes/**`, `docs/**`, and `python/**`. README matching is case-insensitive on the basename and covers future directories without another manifest edit. Dependency and ignored build-output trees and the frozen `.agents/notes/archived/` tree are discovery exclusions, not evolving translation source.
+**Scope**: the root `CONTRIBUTING.md`, `BRAND_GUIDELINES.md`, and `SAFETY.md` documents, every non-vendor README, and every active document under `.agents/notes/**`, `apps/web/platform/**`, `docs/**`, and `python/**`. README matching is case-insensitive on the basename and covers future directories without another manifest edit. Dependency and ignored build-output trees and the frozen `.agents/notes/archived/` tree are discovery exclusions, not evolving translation source.
 
 **Outside scope**: a bundle's detail documents under `packages/<group>/<package>/docs/`, which locale `meta.detail` names for the plugin page. The page shows the file for the active UI language, so these documents carry no in-document language switcher and no consistency record; [`verify-md-links`](../../scripts/verify-md-links.ts) and [`verify-md-wrap`](../../scripts/verify-md-wrap.ts) still check both languages, and review keeps them in step.
 
